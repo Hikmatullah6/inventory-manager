@@ -4,7 +4,7 @@ A hosted inventory management tool for a liquidation store. Upload auction invoi
 
 ## Tech Stack
 
-- **Framework:** Next.js 14 (App Router, TypeScript)
+- **Framework:** Next.js 16 (App Router, TypeScript)
 - **Styling:** Tailwind CSS
 - **Database:** Supabase (Postgres)
 - **Deployment:** Vercel
