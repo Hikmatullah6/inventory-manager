@@ -1,18 +1,20 @@
+// jest.config.ts
 import type { Config } from 'jest';
 
 const config: Config = {
-  preset: 'ts-jest',
   testEnvironment: 'jsdom',
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
   testMatch: [
-    '**/__tests__/**/*.test.ts',
-    '**/__tests__/**/*.test.tsx',
+    '**/__tests__/**/*.{ts,tsx}',
+    '**/*.test.{ts,tsx}',
   ],
   transform: {
-    '^.+\\.(ts|tsx)$': ['ts-jest', { tsconfig: { jsx: 'react-jsx' } }],
+    '^.+\\.(ts|tsx)$': ['ts-jest', {
+      tsconfig: { jsx: 'react-jsx', moduleResolution: 'node' },
+    }],
   },
 };
 

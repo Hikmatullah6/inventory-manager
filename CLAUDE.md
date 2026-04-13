@@ -43,6 +43,7 @@ src/
 │   ├── csv-export.ts     # Build export CSVs
 │   └── supabase-*.ts     # Supabase clients
 └── hooks/                # React hooks (useItems, useItemUpdate)
+└── __tests__/            # Jest test files
 ```
 
 ## Environment Variables
