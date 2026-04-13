@@ -13,7 +13,7 @@ const config: Config = {
   ],
   transform: {
     '^.+\\.(ts|tsx)$': ['ts-jest', {
-      tsconfig: { jsx: 'react-jsx', moduleResolution: 'node' },
+      tsconfig: 'tsconfig.test.json',
     }],
   },
 };
