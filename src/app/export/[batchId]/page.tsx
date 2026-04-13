@@ -1,4 +1,5 @@
 // src/app/export/[batchId]/page.tsx
+import { notFound } from 'next/navigation';
 import { getSupabaseServer } from '@/lib/supabase-server';
 import Link from 'next/link';
 import ExportStats from '@/components/export/ExportStats';
@@ -8,22 +9,28 @@ export default async function ExportPage({ params }: { params: Promise<{ batchId
   const { batchId } = await params;
   const supabase = getSupabaseServer();
 
-  const { data: batch } = await supabase
+  const { data: batch, error: batchError } = await supabase
     .from('auction_batches')
     .select('name')
     .eq('id', batchId)
     .single();
 
-  const { data: items } = await supabase
+  if (batchError || !batch) notFound();
+
+  const { data: items, error: itemsError } = await supabase
     .from('items')
     .select('status')
     .eq('batch_id', batchId);
+
+  if (itemsError) throw itemsError;
 
   const counts = (items ?? []).reduce(
     (acc, item) => {
       acc.total++;
       const key = item.status as string;
-      if (key in acc) acc[key as keyof typeof acc]++;
+      if (key === 'have_it' || key === 'dont_have' || key === 'broken' || key === 'partial' || key === 'pending') {
+        acc[key as 'have_it' | 'dont_have' | 'broken' | 'partial' | 'pending']++;
+      }
       return acc;
     },
     { total: 0, have_it: 0, dont_have: 0, broken: 0, partial: 0, pending: 0 }
