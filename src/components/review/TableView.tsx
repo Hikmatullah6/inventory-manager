@@ -4,9 +4,9 @@ import { Item, ItemUpdate } from '@/lib/types';
 import ItemDetail from './ItemDetail';
 
 const STATUS_BADGE: Record<string, string> = {
-  pending:   'bg-gray-600 text-gray-200',
+  pending:   'bg-yellow-700 text-yellow-100',
   have_it:   'bg-green-700 text-green-100',
-  dont_have: 'bg-gray-700 text-gray-300',
+  dont_have: 'bg-gray-600 text-gray-200',
   broken:    'bg-red-700 text-red-100',
   partial:   'bg-orange-700 text-orange-100',
 };
@@ -27,11 +27,6 @@ interface Props {
 export default function TableView({ items, onUpdate }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = items.find(i => i.id === selectedId) ?? null;
-
-  // When an item is updated, reflect it in the selected item too
-  function handleUpdate(id: string, update: ItemUpdate) {
-    onUpdate(id, update);
-  }
 
   if (!items.length) return (
     <div className="flex items-center justify-center h-64 text-gray-500">
@@ -92,7 +87,7 @@ export default function TableView({ items, onUpdate }: Props) {
           >
             ✕ Close
           </button>
-          <ItemDetail item={selected} onUpdate={handleUpdate} />
+          <ItemDetail item={selected} onUpdate={onUpdate} />
         </div>
       )}
     </div>
