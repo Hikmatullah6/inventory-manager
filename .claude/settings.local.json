@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(C:/Users/hikma/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.7/skills/brainstorming/scripts/start-server.sh:*)",
+      "Bash(cat \"C:/Users/hikma/FileHub/projects/inventory-manager/.superpowers/brainstorm/\"*/state/server-info)",
+      "Bash(gh auth:*)",
+      "Read(//c/Users/hikma/FileHub/projects/**)",
+      "Bash(npx create-next-app@latest inventory-manager --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --no-turbopack --yes)",
+      "Bash(mv /c/Users/hikma/FileHub/projects/inventory-manager/.superpowers /c/Users/hikma/FileHub/projects/.superpowers_backup)",
+      "Bash(mv /c/Users/hikma/FileHub/projects/inventory-manager/.claude /c/Users/hikma/FileHub/projects/.claude_backup)",
+      "Bash(cp -r /c/Users/hikma/FileHub/projects/inventory-manager/.superpowers /tmp/.superpowers_backup)",
+      "Bash(cp -r /c/Users/hikma/FileHub/projects/inventory-manager/.claude /tmp/.claude_backup)",
+      "Bash(npm install:*)",
+      "Bash(cp -r /tmp/.superpowers_backup /c/Users/hikma/FileHub/projects/inventory-manager/.superpowers)",
+      "Bash(cp -r /tmp/.claude_backup /c/Users/hikma/FileHub/projects/inventory-manager/.claude)",
+      "Bash(gh api:*)",
+      "Bash(git init:*)",
+      "Bash(gh repo:*)",
+      "Bash(git remote:*)",
+      "Bash(git add:*)",
+      "Bash(rm -rf /c/Users/hikma/FileHub/projects/inventory-manager/.claude/.claude_backup)",
+      "Bash(git rm:*)",
+      "Bash(ls /c/Users/hikma/FileHub/projects/inventory-manager/.env*)",
+      "Bash(git commit -m ':*)"
+    ]
+  }
+}
