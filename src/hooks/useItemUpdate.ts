@@ -4,6 +4,8 @@ import { Item, ItemUpdate } from '@/lib/types';
 
 export function useItemUpdate(onSuccess?: (item: Item) => void) {
   const inFlight = useRef<Set<string>>(new Set());
+  const onSuccessRef = useRef(onSuccess);
+  onSuccessRef.current = onSuccess;
 
   const updateItem = useCallback(async (id: string, update: ItemUpdate) => {
     if (inFlight.current.has(id)) return;
@@ -16,12 +18,12 @@ export function useItemUpdate(onSuccess?: (item: Item) => void) {
       });
       if (res.ok) {
         const item: Item = await res.json();
-        onSuccess?.(item);
+        onSuccessRef.current?.(item);
       }
     } finally {
       inFlight.current.delete(id);
     }
-  }, [onSuccess]);
+  }, []); // stable — no deps, onSuccess accessed via ref
 
   return { updateItem };
 }
