@@ -41,7 +41,7 @@ export interface ItemUpdate {
   qty_sold?: number;
   shelf_location?: string | null;
   notes?: string | null;
-  reviewed_at?: string;
+  reviewed_at?: string | null;
 }
 
 export interface ParsedCSVRow {
