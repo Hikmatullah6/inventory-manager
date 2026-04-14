@@ -54,12 +54,25 @@ src/
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon/public key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (server-only) |
 
+## CSV Import
+
+The parser handles Google Sheets exports with:
+- A title row before the actual column headers (scans first 10 rows to find headers)
+- Date ranges like `1/22/2026 - 1/27/2026` (takes the first date)
+- `M/D/YYYY` date format (converted to `YYYY-MM-DD` for Postgres)
+- BOM characters and tab-separated values
+
+Required columns: `SKU`, `Title`. All others are optional.
+
 ## Database
 
 Managed in Supabase. Schema lives in `supabase/migrations/001_initial.sql`.
 Apply by running the SQL in the Supabase dashboard SQL Editor.
 
+The service role key (`SUPABASE_SERVICE_ROLE_KEY`) is required for all server-side writes — it bypasses row-level security.
+
 ## Deployment
 
 Deployed to Vercel. Set the three environment variables above in Vercel project settings.
+After adding env vars, trigger a redeploy from the Vercel dashboard.
 Price column in Shopify CSV export is intentionally left blank — fill before importing to Shopify.
