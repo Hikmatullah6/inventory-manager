@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
   if (itemsError) {
     // Roll back: delete the batch (items cascade)
     await supabase.from('auction_batches').delete().eq('id', batch.id);
-    return NextResponse.json({ error: 'Failed to insert items' }, { status: 500 });
+    return NextResponse.json({ error: `Failed to insert items: ${itemsError.message}` }, { status: 500 });
   }
 
   return NextResponse.json({
