@@ -24,7 +24,9 @@ export function buildInternalCSV(items: Item[]): string {
     Cost: item.cost ?? '',
     'Company Name': item.company_name ?? '',
     'Location Bought': item.location_bought ?? '',
-    'Auction Date': item.auction_date ?? '',
+    'Auction Date': item.auction_date_end
+      ? `${item.auction_date} - ${item.auction_date_end}`
+      : (item.auction_date ?? ''),
     Status: item.status,
     'Qty Good': item.qty_good ?? '',
     'Qty Broken': item.qty_broken ?? '',

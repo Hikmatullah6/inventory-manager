@@ -11,10 +11,10 @@ import TableView from '@/components/review/TableView';
 
 export default function ReviewPage() {
   const { batchId } = useParams<{ batchId: string }>();
-  const [view, setView] = useState<'card' | 'table'>('card');
+  const [view, setView] = useState<'card' | 'table'>('table');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<ItemStatus | 'all'>('pending');
-  const [page] = useState(1);
+  const [page, setPage] = useState(1);
   const [cardIndex, setCardIndex] = useState(0);
   const [localItems, setLocalItems] = useState<Item[]>([]);
   const [batch, setBatch] = useState<AuctionBatch | null>(null);
@@ -47,10 +47,12 @@ export default function ReviewPage() {
 
   const handleSearch = useCallback((q: string) => {
     setSearch(q);
+    setPage(1);
   }, []);
 
   const handleStatus = useCallback((s: ItemStatus | 'all') => {
     setStatus(s);
+    setPage(1);
   }, []);
 
   return (
@@ -86,11 +88,26 @@ export default function ReviewPage() {
           <TableView items={localItems} onUpdate={updateItem} />
         )}
 
-        {data && data.total > 50 && (
-          <p className="text-xs text-gray-500 text-center pb-4">
-            Showing {localItems.length} of {data.total} items matching current filter.
-            Use search to narrow results.
-          </p>
+        {data && data.total > data.pageSize && (
+          <div className="flex items-center justify-center gap-4 pb-4">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="px-3 py-1 text-sm rounded bg-gray-700 text-white disabled:opacity-40 hover:bg-gray-600 disabled:cursor-not-allowed"
+            >
+              ← Prev
+            </button>
+            <span className="text-sm text-gray-400">
+              Page {page} of {Math.ceil(data.total / data.pageSize)}
+            </span>
+            <button
+              onClick={() => setPage(p => Math.min(Math.ceil(data.total / data.pageSize), p + 1))}
+              disabled={page === Math.ceil(data.total / data.pageSize)}
+              className="px-3 py-1 text-sm rounded bg-gray-700 text-white disabled:opacity-40 hover:bg-gray-600 disabled:cursor-not-allowed"
+            >
+              Next →
+            </button>
+          </div>
         )}
       </div>
     </div>

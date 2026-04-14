@@ -58,16 +58,17 @@ src/
 
 The parser handles Google Sheets exports with:
 - A title row before the actual column headers (scans first 10 rows to find headers)
-- Date ranges like `1/22/2026 - 1/27/2026` (takes the first date)
-- `M/D/YYYY` date format (converted to `YYYY-MM-DD` for Postgres)
+- Auction date ranges like `1/22/2026 - 1/27/2026` — start stored in `auction_date`, end in `auction_date_end`; exported as `2026-01-22 - 2026-01-27`
+- `M/D/YYYY`, `MM/DD/YYYY`, `M/D/YY`, and `MM/DD/YY` date formats (converted to `YYYY-MM-DD` for Postgres)
 - BOM characters and tab-separated values
 
 Required columns: `SKU`, `Title`. All others are optional.
 
 ## Database
 
-Managed in Supabase. Schema lives in `supabase/migrations/001_initial.sql`.
-Apply by running the SQL in the Supabase dashboard SQL Editor.
+Managed in Supabase. Migrations live in `supabase/migrations/` — apply each in order via the Supabase dashboard SQL Editor:
+- `001_initial.sql` — base schema
+- `002_auction_date_range.sql` — adds `auction_date_end date` column to items
 
 The service role key (`SUPABASE_SERVICE_ROLE_KEY`) is required for all server-side writes — it bypasses row-level security.
 

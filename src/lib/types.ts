@@ -24,6 +24,7 @@ export interface Item {
   company_name: string | null;
   location_bought: string | null;
   auction_date: string | null;
+  auction_date_end: string | null;
   status: ItemStatus;
   qty_good: number | null;
   qty_broken: number | null;
@@ -56,6 +57,7 @@ export interface ParsedCSVRow {
   company_name: string | null;
   location_bought: string | null;
   auction_date: string | null;
+  auction_date_end: string | null;
   shelf_location: string | null;
 }
 

@@ -6,12 +6,23 @@ import { AuctionBatch } from '@/lib/types';
 export default function BatchList() {
   const [batches, setBatches] = useState<AuctionBatch[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/batches')
       .then(r => r.json())
       .then((data: AuctionBatch[]) => { setBatches(data); setLoading(false); });
   }, []);
+
+  async function handleDelete(batch: AuctionBatch) {
+    if (!confirm(`Delete "${batch.name}" and all its items? This cannot be undone.`)) return;
+    setDeleting(batch.id);
+    const res = await fetch(`/api/batches/${batch.id}`, { method: 'DELETE' });
+    if (res.ok) {
+      setBatches(prev => prev.filter(b => b.id !== batch.id));
+    }
+    setDeleting(null);
+  }
 
   if (loading) return null;
   if (!batches.length) return null;
@@ -41,6 +52,13 @@ export default function BatchList() {
             >
               Export
             </Link>
+            <button
+              onClick={() => handleDelete(batch)}
+              disabled={deleting === batch.id}
+              className="px-3 py-1.5 bg-red-900 hover:bg-red-700 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {deleting === batch.id ? '…' : 'Delete'}
+            </button>
           </div>
         </div>
       ))}

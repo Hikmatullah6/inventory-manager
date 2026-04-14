@@ -43,23 +43,34 @@ function normalizeHeader(h: string): string {
   return h.replace(/^\uFEFF/, '').replace(/\r/g, '').trim().toLowerCase();
 }
 
-// Parse a date string into YYYY-MM-DD format.
-// Handles: "1/22/2026", "1/22/2026 - 1/27/2026" (takes first date), "2026-01-22", empty/null.
+// Parse a single date string into YYYY-MM-DD format.
+// Handles: "1/22/2026", "2026-01-22", empty/null.
 function parseDate(value: string | null): string | null {
   if (!value) return null;
-  // Take the first date if it's a range (e.g. "1/22/2026 - 1/27/2026")
-  const first = value.split(/\s*[-–—]\s*/)[0].trim();
-  if (!first) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
   // Already ISO format
-  if (/^\d{4}-\d{2}-\d{2}$/.test(first)) return first;
-  // M/D/YYYY or MM/DD/YYYY
-  const match = first.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+  // M/D/YYYY, MM/DD/YYYY, M/D/YY, or MM/DD/YY
+  const match = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
   if (match) {
-    const [, m, d, y] = match;
+    const [, m, d, rawY] = match;
+    const y = rawY.length === 2 ? `20${rawY}` : rawY;
     return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
   }
   // Unknown format — return null rather than sending a bad value to Postgres
   return null;
+}
+
+// Parse a date field that may be a range (e.g. "1/22/2026 - 1/27/2026").
+// Returns start and end dates in YYYY-MM-DD format.
+function parseDateRange(value: string | null): { start: string | null; end: string | null } {
+  if (!value) return { start: null, end: null };
+  const parts = value.split(/\s*[-–—]\s*/);
+  const start = parseDate(parts[0] ?? null);
+  // Only treat as a range when there are exactly two parts and the second looks like a date
+  const end = parts.length === 2 ? parseDate(parts[1] ?? null) : null;
+  return { start, end };
 }
 
 // Find the first row that contains at least one recognized column (sku or title).
@@ -126,8 +137,12 @@ export function parseAuctionCSV(csvText: string): CSVParseResult {
         mapped.image_count = trimmed ? parseInt(trimmed, 10) || null : null;
       } else if (field === 'cost') {
         mapped.cost = trimmed ? parseFloat(trimmed.replace(/[$,]/g, '')) || null : null;
-      } else if (field === 'date_bought' || field === 'auction_date') {
-        (mapped as Record<string, unknown>)[field] = parseDate(trimmed);
+      } else if (field === 'date_bought') {
+        mapped.date_bought = parseDate(trimmed);
+      } else if (field === 'auction_date') {
+        const { start, end } = parseDateRange(trimmed);
+        mapped.auction_date = start;
+        mapped.auction_date_end = end;
       } else {
         (mapped as Record<string, unknown>)[field] = trimmed;
       }
