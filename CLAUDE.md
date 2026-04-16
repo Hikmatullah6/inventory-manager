@@ -74,6 +74,6 @@ The service role key (`SUPABASE_SERVICE_ROLE_KEY`) is required for all server-si
 
 ## Deployment
 
-Deployed to Vercel. Set the three environment variables above in Vercel project settings.
+Deployed to Vercel. All three environment variables **must** be set in Vercel project settings before the first deploy — missing vars cause a 500 on upload (the upload route validates them explicitly and returns a clear error if absent).
 After adding env vars, trigger a redeploy from the Vercel dashboard.
 Price column in Shopify CSV export is intentionally left blank — fill before importing to Shopify.
