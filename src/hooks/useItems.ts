@@ -6,16 +6,17 @@ interface UseItemsOptions {
   batchId: string;
   search: string;
   status: ItemStatus | 'all';
+  sort: string;
   page: number;
 }
 
-export function useItems({ batchId, search, status, page }: UseItemsOptions) {
+export function useItems({ batchId, search, status, sort, page }: UseItemsOptions) {
   const [data, setData] = useState<ItemsQueryResult | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
-    const params = new URLSearchParams({ batchId, page: String(page), status });
+    const params = new URLSearchParams({ batchId, page: String(page), status, sort });
     if (search) params.set('search', search);
     const res = await fetch(`/api/items?${params}`);
     if (res.ok) {
@@ -23,7 +24,7 @@ export function useItems({ batchId, search, status, page }: UseItemsOptions) {
       setData(json);
     }
     setLoading(false);
-  }, [batchId, search, status, page]);
+  }, [batchId, search, status, sort, page]);
 
   useEffect(() => {
     fetchItems();

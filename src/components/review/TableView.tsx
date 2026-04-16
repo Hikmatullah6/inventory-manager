@@ -80,7 +80,7 @@ export default function TableView({ items, onUpdate }: Props) {
 
       {/* Slide-out detail panel */}
       {selected && (
-        <div className="w-80 flex-shrink-0 overflow-y-auto bg-gray-800 rounded-lg border border-gray-700 p-4">
+        <div className="w-80 flex-shrink-0 overflow-y-auto bg-gray-800 rounded-lg border border-gray-700 p-4 sticky top-4 self-start max-h-[calc(100vh-2rem)]">
           <button
             onClick={() => setSelectedId(null)}
             className="text-gray-400 hover:text-white text-xs mb-3 block"

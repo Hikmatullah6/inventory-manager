@@ -14,6 +14,7 @@ export default function ReviewPage() {
   const [view, setView] = useState<'card' | 'table'>('table');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<ItemStatus | 'all'>('pending');
+  const [sort, setSort] = useState('date_bought_asc');
   const [page, setPage] = useState(1);
   const [cardIndex, setCardIndex] = useState(0);
   const [localItems, setLocalItems] = useState<Item[]>([]);
@@ -29,7 +30,7 @@ export default function ReviewPage() {
       });
   }, [batchId]);
 
-  const { data, loading } = useItems({ batchId, search, status, page });
+  const { data, loading } = useItems({ batchId, search, status, sort, page });
 
   // Sync items from server into local state so we can apply optimistic updates
   useEffect(() => {
@@ -55,6 +56,11 @@ export default function ReviewPage() {
     setPage(1);
   }, []);
 
+  const handleSort = useCallback((s: string) => {
+    setSort(s);
+    setPage(1);
+  }, []);
+
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       <ReviewHeader
@@ -66,7 +72,7 @@ export default function ReviewPage() {
         onViewChange={setView}
       />
       <div className="max-w-4xl mx-auto px-4 py-4 space-y-4">
-        <SearchFilter onSearch={handleSearch} onStatus={handleStatus} status={status} />
+        <SearchFilter onSearch={handleSearch} onStatus={handleStatus} status={status} sort={sort} onSort={handleSort} />
 
         {loading && (
           <div className="flex items-center justify-center h-32">

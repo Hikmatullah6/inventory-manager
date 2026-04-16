@@ -11,13 +11,22 @@ const STATUS_OPTIONS: { value: ItemStatus | 'all'; label: string }[] = [
   { value: 'partial',   label: '⅟ Partial'   },
 ];
 
+const SORT_OPTIONS = [
+  { value: 'date_bought_asc',  label: 'Date Bought ↑' },
+  { value: 'date_bought_desc', label: 'Date Bought ↓' },
+  { value: 'sku_asc',          label: 'SKU ↑' },
+  { value: 'sku_desc',         label: 'SKU ↓' },
+];
+
 interface Props {
   onSearch: (q: string) => void;
   onStatus: (s: ItemStatus | 'all') => void;
   status: ItemStatus | 'all';
+  sort: string;
+  onSort: (s: string) => void;
 }
 
-export default function SearchFilter({ onSearch, onStatus, status }: Props) {
+export default function SearchFilter({ onSearch, onStatus, status, sort, onSort }: Props) {
   const [query, setQuery] = useState('');
 
   useEffect(() => {
@@ -40,6 +49,15 @@ export default function SearchFilter({ onSearch, onStatus, status }: Props) {
         className="bg-gray-800 border border-gray-600 rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-blue-400 text-white"
       >
         {STATUS_OPTIONS.map(o => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+      <select
+        value={sort}
+        onChange={e => onSort(e.target.value)}
+        className="bg-gray-800 border border-gray-600 rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-blue-400 text-white"
+      >
+        {SORT_OPTIONS.map(o => (
           <option key={o.value} value={o.value}>{o.label}</option>
         ))}
       </select>
