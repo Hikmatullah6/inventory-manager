@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServer } from '@/lib/supabase-server';
 import { parseAuctionCSV } from '@/lib/csv-parser';
+import { hashPin } from '@/lib/pin';
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,6 +15,8 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
     const name = ((formData.get('name') as string) || '').trim() || 'Unnamed Batch';
+    const pinRaw = ((formData.get('pin') as string) || '').trim();
+    const pin_hash = /^\d{4}$/.test(pinRaw) ? hashPin(pinRaw) : null;
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
@@ -35,7 +38,7 @@ export async function POST(req: NextRequest) {
 
     const { data: batch, error: batchError } = await supabase
       .from('auction_batches')
-      .insert({ name })
+      .insert({ name, pin_hash })
       .select()
       .single();
 

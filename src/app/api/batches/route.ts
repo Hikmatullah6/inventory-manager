@@ -6,7 +6,7 @@ export async function GET() {
 
   const { data: batches, error } = await supabase
     .from('auction_batches')
-    .select('id, name, imported_at')
+    .select('id, name, imported_at, pin_hash')
     .order('imported_at', { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -28,6 +28,7 @@ export async function GET() {
       id: batch.id,
       name: batch.name,
       imported_at: batch.imported_at,
+      pin_hash: batch.pin_hash ?? null,
       item_count: total ?? 0,
       reviewed_count: reviewed ?? 0,
     };

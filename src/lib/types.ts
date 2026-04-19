@@ -8,6 +8,7 @@ export interface AuctionBatch {
   imported_at: string;
   item_count: number;
   reviewed_count: number;
+  pin_hash: string | null;
 }
 
 export interface Item {
