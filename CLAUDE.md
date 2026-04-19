@@ -33,14 +33,19 @@ src/
 │   ├── review/[batchId]/ # Item review screen (dad's phone)
 │   ├── export/[batchId]/ # CSV export screen
 │   └── api/              # API routes (upload, items, export)
+│       └── batches/[id]/verify-pin/ # PIN verification endpoint
 ├── components/           # React components
 │   ├── upload/           # UploadZone, BatchList
 │   ├── review/           # CardView, TableView, ItemDetail, etc.
-│   └── export/           # ExportStats, ExportButtons
+│   ├── export/           # ExportStats, ExportButtons
+│   ├── PinModal.tsx      # 4-digit PIN entry modal
+│   └── PinGate.tsx       # Client-side PIN gate wrapper
 ├── lib/                  # Shared utilities
 │   ├── types.ts          # TypeScript types
 │   ├── csv-parser.ts     # Parse auction invoice CSVs
 │   ├── csv-export.ts     # Build export CSVs
+│   ├── pin.ts            # Server-only: PIN hashing + master PIN
+│   ├── session.ts        # Client-only: sessionStorage helpers
 │   └── supabase-*.ts     # Supabase clients
 └── hooks/                # React hooks (useItems, useItemUpdate)
 └── __tests__/            # Jest test files
@@ -69,8 +74,20 @@ Required columns: `SKU`, `Title`. All others are optional.
 Managed in Supabase. Migrations live in `supabase/migrations/` — apply each in order via the Supabase dashboard SQL Editor:
 - `001_initial.sql` — base schema
 - `002_auction_date_range.sql` — adds `auction_date_end date` column to items
+- `003_pin_auth.sql` — adds `pin_hash text` column to `auction_batches`
 
 The service role key (`SUPABASE_SERVICE_ROLE_KEY`) is required for all server-side writes — it bypasses row-level security.
+
+## PIN Authentication
+
+Each batch can optionally be protected with a 4-digit PIN set at upload time. PINs are SHA-256 hashed server-side and never sent to the client in plaintext.
+
+- **Upload:** user selects a CSV, enters an optional name and optional 4-digit PIN, then clicks Submit
+- **Access (review/export):** PIN prompt appears before content is shown; bypassed if already verified in the current browser session
+- **Delete:** PIN required before deletion goes through; sent in the DELETE request body and verified server-side
+- **Master PIN:** `2311` bypasses all batch PINs. Defined only in `src/lib/pin.ts` (server-only) — never exposed to the client bundle
+- **Session memory:** once a batch PIN is verified in a tab, it is cached in `sessionStorage` for the lifetime of that tab. The uploader is auto-verified after a successful upload so they don't need to re-enter their own PIN immediately
+- Batches with `pin_hash = NULL` (e.g. uploaded without a PIN) are freely accessible — no prompt shown
 
 ## Deployment
 

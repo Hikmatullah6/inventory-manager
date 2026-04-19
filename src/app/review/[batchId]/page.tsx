@@ -1,6 +1,6 @@
 'use client';
 import { useState, useCallback, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { AuctionBatch, Item, ItemStatus, ItemUpdate } from '@/lib/types';
 import { useItems } from '@/hooks/useItems';
 import { useItemUpdate } from '@/hooks/useItemUpdate';
@@ -8,9 +8,15 @@ import ReviewHeader from '@/components/review/ReviewHeader';
 import SearchFilter from '@/components/review/SearchFilter';
 import CardView from '@/components/review/CardView';
 import TableView from '@/components/review/TableView';
+import PinModal from '@/components/PinModal';
+import {
+  isBatchVerified, isMasterVerified,
+  setBatchVerified, storeVerifiedPin, setMasterVerified,
+} from '@/lib/session';
 
 export default function ReviewPage() {
   const { batchId } = useParams<{ batchId: string }>();
+  const router = useRouter();
   const [view, setView] = useState<'card' | 'table'>('table');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<ItemStatus | 'all'>('pending');
@@ -19,14 +25,22 @@ export default function ReviewPage() {
   const [cardIndex, setCardIndex] = useState(0);
   const [localItems, setLocalItems] = useState<Item[]>([]);
   const [batch, setBatch] = useState<AuctionBatch | null>(null);
+  const [pinVerified, setPinVerified] = useState(false);
+  const [pinChecked, setPinChecked] = useState(false);
 
-  // Fetch batch info for the header (name + reviewed/total counts)
+  // Fetch batch info and check PIN status
   useEffect(() => {
     fetch('/api/batches')
       .then(r => r.json())
       .then((batches: AuctionBatch[]) => {
         const found = batches.find(b => b.id === batchId);
-        if (found) setBatch(found);
+        if (found) {
+          setBatch(found);
+          if (!found.pin_hash || isBatchVerified(batchId) || isMasterVerified()) {
+            setPinVerified(true);
+          }
+        }
+        setPinChecked(true);
       });
   }, [batchId]);
 
@@ -60,6 +74,25 @@ export default function ReviewPage() {
     setSort(s);
     setPage(1);
   }, []);
+
+  if (!pinChecked) return null;
+
+  if (!pinVerified && batch) {
+    return (
+      <PinModal
+        batchId={batchId}
+        batchName={batch.name}
+        mode="access"
+        onSuccess={(pin, isMaster) => {
+          setBatchVerified(batchId);
+          storeVerifiedPin(batchId, pin);
+          if (isMaster) setMasterVerified();
+          setPinVerified(true);
+        }}
+        onCancel={() => router.push('/')}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
