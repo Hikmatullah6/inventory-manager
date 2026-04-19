@@ -88,12 +88,11 @@ Each batch can optionally be protected with a 4-digit PIN set at upload time. PI
 - **Upload:** user selects a CSV, enters an optional name and optional 4-digit PIN, then clicks Submit
 - **Access (review/export):** PIN prompt appears before content is shown; bypassed if already verified in the current browser session
 - **Delete:** PIN required before deletion goes through; sent in the DELETE request body and verified server-side
-- **Master PIN:** read from the `MASTER_PIN` environment variable at runtime — never hardcoded. Set it in `.env.local` and in Vercel project settings. Never exposed to the client bundle.
+- **Master PIN:** read from the `MASTER_PIN` environment variable at runtime — never hardcoded. Set it in `.env.local` and in Vercel project settings. Never exposed to the client bundle. If the variable is missing, the master bypass is silently disabled but regular batch PINs still work.
 - **Session memory:** once a batch PIN is verified in a tab, it is cached in `sessionStorage` for the lifetime of that tab. The uploader is auto-verified after a successful upload so they don't need to re-enter their own PIN immediately
 - Batches with `pin_hash = NULL` (e.g. uploaded without a PIN) are freely accessible — no prompt shown
 
 ## Deployment
 
-Deployed to Vercel. All three environment variables **must** be set in Vercel project settings before the first deploy — missing vars cause a 500 on upload (the upload route validates them explicitly and returns a clear error if absent).
-After adding env vars, trigger a redeploy from the Vercel dashboard.
+Deployed to Vercel. The first three environment variables below **must** be set in Vercel project settings before the first deploy — missing vars cause a 500 on upload. `MASTER_PIN` should also be set or the master bypass will be disabled. After adding env vars, trigger a redeploy from the Vercel dashboard.
 Price column in Shopify CSV export is intentionally left blank — fill before importing to Shopify.
