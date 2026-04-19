@@ -58,6 +58,7 @@ src/
 | `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon/public key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (server-only) |
+| `MASTER_PIN` | 4-digit admin PIN that bypasses all batch PINs (server-only) |
 
 ## CSV Import
 
@@ -87,7 +88,7 @@ Each batch can optionally be protected with a 4-digit PIN set at upload time. PI
 - **Upload:** user selects a CSV, enters an optional name and optional 4-digit PIN, then clicks Submit
 - **Access (review/export):** PIN prompt appears before content is shown; bypassed if already verified in the current browser session
 - **Delete:** PIN required before deletion goes through; sent in the DELETE request body and verified server-side
-- **Master PIN:** `2311` bypasses all batch PINs. Defined only in `src/lib/pin.ts` (server-only) — never exposed to the client bundle
+- **Master PIN:** read from the `MASTER_PIN` environment variable at runtime — never hardcoded. Set it in `.env.local` and in Vercel project settings. Never exposed to the client bundle.
 - **Session memory:** once a batch PIN is verified in a tab, it is cached in `sessionStorage` for the lifetime of that tab. The uploader is auto-verified after a successful upload so they don't need to re-enter their own PIN immediately
 - Batches with `pin_hash = NULL` (e.g. uploaded without a PIN) are freely accessible — no prompt shown
 

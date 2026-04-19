@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServer } from '@/lib/supabase-server';
-import { verifyPin, MASTER_PIN } from '@/lib/pin';
+import { verifyPin } from '@/lib/pin';
 
 export async function POST(
   req: NextRequest,
@@ -34,5 +34,5 @@ export async function POST(
     return NextResponse.json({ error: 'Incorrect PIN' }, { status: 401 });
   }
 
-  return NextResponse.json({ ok: true, master: pin === MASTER_PIN });
+  return NextResponse.json({ ok: true, master: pin === process.env.MASTER_PIN });
 }
