@@ -69,6 +69,8 @@ The parser handles Google Sheets exports with:
 
 Required columns: `SKU`, `Title`. All others are optional.
 
+`public/example-inventory.csv` is a 20-product sample file covering all supported columns. It is linked on the home page as a download for new users — do not delete or rename it.
+
 ## Database
 
 Managed in Supabase. Migrations live in `supabase/migrations/` — apply each in order via the Supabase dashboard SQL Editor:
