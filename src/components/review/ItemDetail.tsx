@@ -40,7 +40,12 @@ export default function ItemDetail({ item, onUpdate }: Props) {
 
   function handleStatusClick(s: ItemStatus) {
     setStatus(s);
-    onUpdate(item.id, { status: s });
+    if (s !== 'sold') {
+      setSalePrice('');
+      onUpdate(item.id, { status: s, sale_price: null });
+    } else {
+      onUpdate(item.id, { status: s });
+    }
   }
 
   function handleBlur(field: keyof ItemUpdate, value: string | number | null) {
@@ -89,7 +94,7 @@ export default function ItemDetail({ item, onUpdate }: Props) {
         )}
       </div>
 
-      {/* Status buttons — 2x2 grid, touch-friendly */}
+      {/* Status buttons — 3×2 grid, touch-friendly */}
       <div className="grid grid-cols-2 gap-2">
         {STATUS_OPTIONS.map(opt => (
           <button
@@ -116,7 +121,7 @@ export default function ItemDetail({ item, onUpdate }: Props) {
             value={salePrice}
             onChange={e => setSalePrice(e.target.value)}
             onBlur={() => {
-              const num = salePrice === '' ? null : parseFloat(salePrice);
+              const num = salePrice === '' ? null : Math.max(0, parseFloat(salePrice));
               onUpdate(item.id, { sale_price: num });
             }}
             placeholder="0.00"
