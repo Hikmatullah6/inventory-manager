@@ -19,13 +19,23 @@ export default async function ExportPage({ params }: { params: Promise<{ batchId
 
   if (batchError || !batch) notFound();
 
-  const { data: items, error: itemsError } = await supabase
-    .from('items')
-    .select('status')
-    .eq('batch_id', batchId);
+  const pageSize = 1000;
+  const allStatuses: { status: string }[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from('items')
+      .select('status')
+      .eq('batch_id', batchId)
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    allStatuses.push(...data);
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
 
-  if (itemsError) throw itemsError;
-
+  const items = allStatuses;
   const VALID_STATUSES = new Set<string>(['have_it', 'dont_have', 'broken', 'partial', 'pending', 'sold', 'personal_use']);
 
   const counts = (items ?? []).reduce(
