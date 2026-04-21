@@ -4,19 +4,23 @@ import { Item, ItemUpdate } from '@/lib/types';
 import ItemDetail from './ItemDetail';
 
 const STATUS_BADGE: Record<string, string> = {
-  pending:   'bg-yellow-700 text-yellow-100',
-  have_it:   'bg-green-700 text-green-100',
-  dont_have: 'bg-gray-600 text-gray-200',
-  broken:    'bg-red-700 text-red-100',
-  partial:   'bg-orange-700 text-orange-100',
+  pending:      'bg-yellow-700 text-yellow-100',
+  have_it:      'bg-green-700 text-green-100',
+  dont_have:    'bg-gray-600 text-gray-200',
+  broken:       'bg-red-700 text-red-100',
+  partial:      'bg-orange-700 text-orange-100',
+  sold:         'bg-blue-700 text-blue-100',
+  personal_use: 'bg-purple-700 text-purple-100',
 };
 
 const STATUS_LABEL: Record<string, string> = {
-  pending:   '⏳ Pending',
-  have_it:   '✓ Have It',
-  dont_have: "✗ Don't Have",
-  broken:    '⚠ Broken',
-  partial:   '⅟ Partial',
+  pending:      '⏳ Pending',
+  have_it:      '✓ Have It',
+  dont_have:    "✗ Don't Have",
+  broken:       '⚠ Broken',
+  partial:      '⅟ Partial',
+  sold:         '$ Sold',
+  personal_use: '♥ Personal Use',
 };
 
 interface Props {

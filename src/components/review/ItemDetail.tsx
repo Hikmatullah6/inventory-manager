@@ -3,10 +3,12 @@ import { useState, useEffect } from 'react';
 import { Item, ItemStatus, ItemUpdate } from '@/lib/types';
 
 const STATUS_OPTIONS: { value: ItemStatus; label: string; color: string }[] = [
-  { value: 'have_it',   label: '✓ Have It',     color: 'bg-green-700 hover:bg-green-600' },
-  { value: 'dont_have', label: "✗ Don't Have",  color: 'bg-gray-600 hover:bg-gray-500'  },
-  { value: 'broken',    label: '⚠ Broken',       color: 'bg-red-700 hover:bg-red-600'    },
-  { value: 'partial',   label: '⅟ Partial',      color: 'bg-orange-700 hover:bg-orange-600' },
+  { value: 'have_it',      label: '✓ Have It',        color: 'bg-green-700 hover:bg-green-600'   },
+  { value: 'dont_have',    label: "✗ Don't Have",     color: 'bg-gray-600 hover:bg-gray-500'     },
+  { value: 'broken',       label: '⚠ Broken',          color: 'bg-red-700 hover:bg-red-600'       },
+  { value: 'partial',      label: '⅟ Partial',         color: 'bg-orange-700 hover:bg-orange-600' },
+  { value: 'sold',         label: '$ Sold',            color: 'bg-blue-700 hover:bg-blue-600'     },
+  { value: 'personal_use', label: '♥ Personal Use',   color: 'bg-purple-700 hover:bg-purple-600' },
 ];
 
 interface Props {
@@ -21,6 +23,7 @@ export default function ItemDetail({ item, onUpdate }: Props) {
   const [qtySold, setQtySold] = useState(String(item.qty_sold));
   const [location, setLocation] = useState(item.shelf_location ?? '');
   const [notes, setNotes] = useState(item.notes ?? '');
+  const [salePrice, setSalePrice] = useState(item.sale_price != null ? String(item.sale_price) : '');
   const [imgError, setImgError] = useState(false);
 
   // Sync state when item changes (e.g. card view navigates to next item)
@@ -31,6 +34,7 @@ export default function ItemDetail({ item, onUpdate }: Props) {
     setQtySold(String(item.qty_sold));
     setLocation(item.shelf_location ?? '');
     setNotes(item.notes ?? '');
+    setSalePrice(item.sale_price != null ? String(item.sale_price) : '');
     setImgError(false);
   }, [item.id]);
 
@@ -101,6 +105,25 @@ export default function ItemDetail({ item, onUpdate }: Props) {
           </button>
         ))}
       </div>
+
+      {status === 'sold' && (
+        <div>
+          <label className="text-xs text-gray-400 block mb-1">Sale Price (optional)</label>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={salePrice}
+            onChange={e => setSalePrice(e.target.value)}
+            onBlur={() => {
+              const num = salePrice === '' ? null : parseFloat(salePrice);
+              onUpdate(item.id, { sale_price: num });
+            }}
+            placeholder="0.00"
+            className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+          />
+        </div>
+      )}
 
       {/* Quantities */}
       <div className="grid grid-cols-3 gap-2">

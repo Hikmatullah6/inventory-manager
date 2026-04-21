@@ -3,12 +3,14 @@ import { useEffect, useState } from 'react';
 import { ItemStatus } from '@/lib/types';
 
 const STATUS_OPTIONS: { value: ItemStatus | 'all'; label: string }[] = [
-  { value: 'all',       label: 'All'         },
-  { value: 'pending',   label: '⏳ Pending'  },
-  { value: 'have_it',   label: '✓ Have It'   },
-  { value: 'dont_have', label: "✗ Don't Have" },
-  { value: 'broken',    label: '⚠ Broken'    },
-  { value: 'partial',   label: '⅟ Partial'   },
+  { value: 'all',          label: 'All'           },
+  { value: 'pending',      label: '⏳ Pending'    },
+  { value: 'have_it',      label: '✓ Have It'     },
+  { value: 'dont_have',    label: "✗ Don't Have"  },
+  { value: 'broken',       label: '⚠ Broken'      },
+  { value: 'partial',      label: '⅟ Partial'     },
+  { value: 'sold',         label: '$ Sold'        },
+  { value: 'personal_use', label: '♥ Personal Use' },
 ];
 
 const SORT_OPTIONS = [
