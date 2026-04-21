@@ -1,4 +1,4 @@
-import { buildInternalCSV, buildShopifyCSV } from '@/lib/csv-export';
+import { buildInternalCSV, buildShopifyCSV, buildSoldCSV, buildPersonalUseCSV } from '@/lib/csv-export';
 import { Item } from '@/lib/types';
 
 const makeItem = (overrides: Partial<Item> = {}): Item => ({
@@ -104,5 +104,66 @@ describe('buildShopifyCSV', () => {
     const csv = buildShopifyCSV(items);
     expect(csv).not.toContain('LQ-001');
     expect(csv).not.toContain('LQ-002');
+  });
+
+  it('excludes sold items', () => {
+    const csv = buildShopifyCSV([makeItem({ status: 'sold' })]);
+    expect(csv).not.toContain('LQ-001');
+  });
+
+  it('excludes personal_use items', () => {
+    const csv = buildShopifyCSV([makeItem({ status: 'personal_use' })]);
+    expect(csv).not.toContain('LQ-001');
+  });
+});
+
+describe('buildInternalCSV — sold/personal_use exclusions', () => {
+  it('excludes sold items', () => {
+    const csv = buildInternalCSV([makeItem({ status: 'sold' })]);
+    expect(csv).not.toContain('LQ-001');
+  });
+
+  it('excludes personal_use items', () => {
+    const csv = buildInternalCSV([makeItem({ status: 'personal_use' })]);
+    expect(csv).not.toContain('LQ-001');
+  });
+});
+
+describe('buildSoldCSV', () => {
+  it('includes only sold items', () => {
+    const items = [
+      makeItem({ sku: 'LQ-001', status: 'sold' }),
+      makeItem({ sku: 'LQ-002', status: 'have_it' }),
+      makeItem({ sku: 'LQ-003', status: 'personal_use' }),
+    ];
+    const csv = buildSoldCSV(items);
+    expect(csv).toContain('LQ-001');
+    expect(csv).not.toContain('LQ-002');
+    expect(csv).not.toContain('LQ-003');
+  });
+
+  it('includes the correct columns', () => {
+    const csv = buildSoldCSV([makeItem({ status: 'sold' })]);
+    const headers = csv.split('\n')[0];
+    expect(headers).toContain('SKU');
+    expect(headers).toContain('Title');
+    expect(headers).toContain('Cost');
+    expect(headers).toContain('Sale Price');
+    expect(headers).toContain('Auction Date');
+    expect(headers).toContain('Notes');
+  });
+});
+
+describe('buildPersonalUseCSV', () => {
+  it('includes only personal_use items', () => {
+    const items = [
+      makeItem({ sku: 'LQ-001', status: 'personal_use' }),
+      makeItem({ sku: 'LQ-002', status: 'have_it' }),
+      makeItem({ sku: 'LQ-003', status: 'sold' }),
+    ];
+    const csv = buildPersonalUseCSV(items);
+    expect(csv).toContain('LQ-001');
+    expect(csv).not.toContain('LQ-002');
+    expect(csv).not.toContain('LQ-003');
   });
 });

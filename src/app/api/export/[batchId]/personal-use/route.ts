@@ -19,7 +19,9 @@ export async function GET(
     .from('items')
     .select('*')
     .eq('batch_id', batchId)
-    .order('created_at', { ascending: true }).limit(5000);
+    .eq('status', 'personal_use')
+    .order('created_at', { ascending: true })
+    .limit(5000);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
