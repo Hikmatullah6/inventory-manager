@@ -29,12 +29,12 @@ export default async function ExportPage({ params }: { params: Promise<{ batchId
     (acc, item) => {
       acc.total++;
       const key = item.status as string;
-      if (key === 'have_it' || key === 'dont_have' || key === 'broken' || key === 'partial' || key === 'pending') {
-        acc[key as 'have_it' | 'dont_have' | 'broken' | 'partial' | 'pending']++;
+      if (key === 'have_it' || key === 'dont_have' || key === 'broken' || key === 'partial' || key === 'pending' || key === 'sold' || key === 'personal_use') {
+        acc[key as 'have_it' | 'dont_have' | 'broken' | 'partial' | 'pending' | 'sold' | 'personal_use']++;
       }
       return acc;
     },
-    { total: 0, have_it: 0, dont_have: 0, broken: 0, partial: 0, pending: 0 }
+    { total: 0, have_it: 0, dont_have: 0, broken: 0, partial: 0, pending: 0, sold: 0, personal_use: 0 }
   );
 
   const exportCount = counts.have_it + counts.broken + counts.partial;
@@ -49,10 +49,12 @@ export default async function ExportPage({ params }: { params: Promise<{ batchId
             <p className="text-gray-400 text-sm mt-1">Download your inventory as CSV</p>
           </div>
           <ExportStats stats={counts} />
-          <ExportButtons batchId={batchId} exportCount={exportCount} />
-          <div className="text-xs text-gray-500 border-t border-gray-700 pt-4">
-            <p>💡 The Shopify CSV leaves the Price column blank. Fill it in before importing to Shopify.</p>
-          </div>
+          <ExportButtons
+            batchId={batchId}
+            inventoryCount={exportCount}
+            soldCount={counts.sold}
+            personalUseCount={counts.personal_use}
+          />
         </div>
       </div>
     </PinGate>
