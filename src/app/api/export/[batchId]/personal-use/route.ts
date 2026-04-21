@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServer } from '@/lib/supabase-server';
-import { buildPersonalUseCSV } from '@/lib/csv-export';
+import { buildPersonalUseCSV, fetchAllItems } from '@/lib/csv-export';
 
 export async function GET(
   _req: NextRequest,
@@ -15,17 +15,14 @@ export async function GET(
     .eq('id', batchId)
     .single();
 
-  const { data: items, error } = await supabase
-    .from('items')
-    .select('*')
-    .eq('batch_id', batchId)
-    .eq('status', 'personal_use')
-    .order('created_at', { ascending: true })
-    .limit(5000);
+  let items;
+  try { items = await fetchAllItems(supabase, batchId, 'personal_use'); }
+  catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-  const csv = buildPersonalUseCSV(items ?? []);
+  const csv = buildPersonalUseCSV(items);
   const filename = `${batch?.name ?? 'inventory'}-personal-use.csv`
     .replace(/[^a-z0-9\-_.]/gi, '_');
 

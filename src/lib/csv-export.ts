@@ -1,6 +1,33 @@
 // src/lib/csv-export.ts
 import Papa from 'papaparse';
 import { Item } from './types';
+import { SupabaseClient } from '@supabase/supabase-js';
+
+export async function fetchAllItems(
+  supabase: SupabaseClient,
+  batchId: string,
+  status?: string,
+): Promise<Item[]> {
+  const pageSize = 1000;
+  const all: Item[] = [];
+  let from = 0;
+  while (true) {
+    let q = supabase
+      .from('items')
+      .select('*')
+      .eq('batch_id', batchId)
+      .order('created_at', { ascending: true })
+      .range(from, from + pageSize - 1);
+    if (status) q = q.eq('status', status);
+    const { data, error } = await q;
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    all.push(...data);
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  return all;
+}
 
 const EXCLUDED_STATUSES = new Set(['dont_have', 'pending', 'sold', 'personal_use']);
 
