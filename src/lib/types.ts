@@ -1,6 +1,6 @@
 // src/lib/types.ts
 
-export type ItemStatus = 'pending' | 'have_it' | 'dont_have' | 'broken' | 'partial';
+export type ItemStatus = 'pending' | 'have_it' | 'dont_have' | 'broken' | 'partial' | 'sold' | 'personal_use';
 
 export interface AuctionBatch {
   id: string;
@@ -22,6 +22,7 @@ export interface Item {
   description: string | null;
   date_bought: string | null;
   cost: number | null;
+  sale_price: number | null;
   company_name: string | null;
   location_bought: string | null;
   auction_date: string | null;
@@ -38,6 +39,7 @@ export interface Item {
 
 export interface ItemUpdate {
   status?: ItemStatus;
+  sale_price?: number | null;
   qty_good?: number | null;
   qty_broken?: number | null;
   qty_sold?: number;
