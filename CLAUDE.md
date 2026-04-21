@@ -78,8 +78,25 @@ Managed in Supabase. Migrations live in `supabase/migrations/` — apply each in
 - `001_initial.sql` — base schema
 - `002_auction_date_range.sql` — adds `auction_date_end date` column to items
 - `003_pin_auth.sql` — adds `pin_hash text` column to `auction_batches`
+- `004_sold_personal_use.sql` — adds `sale_price numeric` column to items; expands status check constraint to include `sold` and `personal_use`
 
 The service role key (`SUPABASE_SERVICE_ROLE_KEY`) is required for all server-side writes — it bypasses row-level security.
+
+## Item Statuses
+
+Each item has one of seven statuses set during review:
+
+| Status | Meaning | Appears in export |
+|---|---|---|
+| `pending` | Not yet reviewed (default) | Excluded from all exports |
+| `have_it` | In stock and sellable | Inventory CSV, Shopify CSV |
+| `dont_have` | Not found / missing | Excluded from all exports |
+| `broken` | Damaged | Inventory CSV only |
+| `partial` | Incomplete set | Inventory CSV, Shopify CSV |
+| `sold` | Already sold | Sold CSV only |
+| `personal_use` | Kept for personal use | Personal Use CSV only |
+
+`sale_price` is an optional numeric field on items — visible and editable inline when status is `sold`.
 
 ## PIN Authentication
 
@@ -92,7 +109,19 @@ Each batch can optionally be protected with a 4-digit PIN set at upload time. PI
 - **Session memory:** once a batch PIN is verified in a tab, it is cached in `sessionStorage` for the lifetime of that tab. The uploader is auto-verified after a successful upload so they don't need to re-enter their own PIN immediately
 - Batches with `pin_hash = NULL` (e.g. uploaded without a PIN) are freely accessible — no prompt shown
 
+## CSV Exports
+
+The export page (`/export/[batchId]`) has four tabs:
+
+| Tab | API route | Items included |
+|---|---|---|
+| Inventory | `/api/export/[batchId]/internal` | have_it, broken, partial |
+| Shopify | `/api/export/[batchId]/shopify` | have_it, partial |
+| Sold | `/api/export/[batchId]/sold` | sold |
+| Personal Use | `/api/export/[batchId]/personal-use` | personal_use |
+
+All export routes use paginated Supabase queries (1000 rows/page) so they are not subject to the server-side `max_rows` cap. The Shopify CSV leaves the Price column blank — fill before importing to Shopify.
+
 ## Deployment
 
 Deployed to Vercel. The first three environment variables below **must** be set in Vercel project settings before the first deploy — missing vars cause a 500 on upload. `MASTER_PIN` should also be set or the master bypass will be disabled. After adding env vars, trigger a redeploy from the Vercel dashboard.
-Price column in Shopify CSV export is intentionally left blank — fill before importing to Shopify.
