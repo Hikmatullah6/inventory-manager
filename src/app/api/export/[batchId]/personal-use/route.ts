@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServer } from '@/lib/supabase-server';
-import { buildShopifyCSV } from '@/lib/csv-export';
+import { buildPersonalUseCSV } from '@/lib/csv-export';
 
 export async function GET(
   _req: NextRequest,
@@ -23,8 +23,8 @@ export async function GET(
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const csv = buildShopifyCSV(items ?? []);
-  const filename = `${batch?.name ?? 'inventory'}-shopify.csv`
+  const csv = buildPersonalUseCSV(items ?? []);
+  const filename = `${batch?.name ?? 'inventory'}-personal-use.csv`
     .replace(/[^a-z0-9\-_.]/gi, '_');
 
   return new NextResponse(csv, {
