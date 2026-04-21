@@ -5,6 +5,7 @@ import Link from 'next/link';
 import ExportStats from '@/components/export/ExportStats';
 import ExportButtons from '@/components/export/ExportButtons';
 import PinGate from '@/components/PinGate';
+import type { ItemStatus } from '@/lib/types';
 
 export default async function ExportPage({ params }: { params: Promise<{ batchId: string }> }) {
   const { batchId } = await params;
@@ -25,16 +26,17 @@ export default async function ExportPage({ params }: { params: Promise<{ batchId
 
   if (itemsError) throw itemsError;
 
+  const VALID_STATUSES = new Set<string>(['have_it', 'dont_have', 'broken', 'partial', 'pending', 'sold', 'personal_use']);
+
   const counts = (items ?? []).reduce(
     (acc, item) => {
       acc.total++;
-      const key = item.status as string;
-      if (key === 'have_it' || key === 'dont_have' || key === 'broken' || key === 'partial' || key === 'pending' || key === 'sold' || key === 'personal_use') {
-        acc[key as 'have_it' | 'dont_have' | 'broken' | 'partial' | 'pending' | 'sold' | 'personal_use']++;
+      if (VALID_STATUSES.has(item.status)) {
+        acc[item.status as ItemStatus]++;
       }
       return acc;
     },
-    { total: 0, have_it: 0, dont_have: 0, broken: 0, partial: 0, pending: 0, sold: 0, personal_use: 0 }
+    { total: 0, have_it: 0, dont_have: 0, broken: 0, partial: 0, pending: 0, sold: 0, personal_use: 0 } as { total: number } & Record<ItemStatus, number>
   );
 
   const exportCount = counts.have_it + counts.broken + counts.partial;

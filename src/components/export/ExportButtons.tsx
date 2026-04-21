@@ -29,6 +29,7 @@ export default function ExportButtons({ batchId, inventoryCount, soldCount, pers
         {tabs.map(tab => (
           <button
             key={tab.id}
+            type="button"
             onClick={() => setActiveTab(tab.id)}
             className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
               activeTab === tab.id
