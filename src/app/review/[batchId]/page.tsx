@@ -1,154 +1,57 @@
-'use client';
-import { useState, useCallback, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { AuctionBatch, Item, ItemStatus, ItemUpdate } from '@/lib/types';
-import { useItems } from '@/hooks/useItems';
-import { useItemUpdate } from '@/hooks/useItemUpdate';
-import ReviewHeader from '@/components/review/ReviewHeader';
-import SearchFilter from '@/components/review/SearchFilter';
-import CardView from '@/components/review/CardView';
-import TableView from '@/components/review/TableView';
-import PinModal from '@/components/PinModal';
-import {
-  isBatchVerified, isMasterVerified,
-  setBatchVerified, storeVerifiedPin, setMasterVerified,
-} from '@/lib/session';
+// src/app/review/[batchId]/page.tsx
+import { notFound } from 'next/navigation';
+import { getSupabaseServer } from '@/lib/supabase-server';
+import { getStatusCounts } from '@/lib/item-counts';
+import ReviewClient from '@/components/review/ReviewClient';
+import type { Item } from '@/lib/types';
 
-export default function ReviewPage() {
-  const { batchId } = useParams<{ batchId: string }>();
-  const router = useRouter();
-  const [view, setView] = useState<'card' | 'table'>('table');
-  const [search, setSearch] = useState('');
-  const [status, setStatus] = useState<ItemStatus | 'all'>('pending');
-  const [sort, setSort] = useState('date_bought_asc');
-  const [page, setPage] = useState(1);
-  const [cardIndex, setCardIndex] = useState(0);
-  const [localItems, setLocalItems] = useState<Item[]>([]);
-  const [batch, setBatch] = useState<AuctionBatch | null>(null);
-  const [pinVerified, setPinVerified] = useState(false);
-  const [pinChecked, setPinChecked] = useState(false);
+/** Must match the client's opening filter and sort, and /api/items' page size. */
+const INITIAL_STATUS = 'pending';
+const INITIAL_SORT = { column: 'date_bought', ascending: true };
+const PAGE_SIZE = 50;
 
-  // Fetch batch info and check PIN status
-  useEffect(() => {
-    fetch('/api/batches')
-      .then(r => r.json())
-      .then((batches: AuctionBatch[]) => {
-        const found = batches.find(b => b.id === batchId);
-        if (found) {
-          setBatch(found);
-          if (!found.pin_hash || isBatchVerified(batchId) || isMasterVerified()) {
-            setPinVerified(true);
-          }
-        }
-        setPinChecked(true);
-      });
-  }, [batchId]);
+export default async function ReviewPage({ params }: { params: Promise<{ batchId: string }> }) {
+  const { batchId } = await params;
+  const supabase = getSupabaseServer();
 
-  const { data, loading } = useItems({ batchId, search, status, sort, page });
+  // Batch, progress and the first page of items all at once. This used to be a
+  // fetch of every batch in the account (two count queries each) followed by a
+  // second fetch for the items, with a blank screen until both landed.
+  const [batchResult, totalResult, reviewedResult, itemsResult, counts] = await Promise.all([
+    supabase.from('auction_batches').select('id, name, imported_at, pin_hash').eq('id', batchId).single(),
+    supabase.from('items').select('*', { count: 'exact', head: true }).eq('batch_id', batchId),
+    supabase.from('items').select('*', { count: 'exact', head: true }).eq('batch_id', batchId).neq('status', 'pending'),
+    supabase
+      .from('items')
+      .select('*', { count: 'exact' })
+      .eq('batch_id', batchId)
+      .eq('status', INITIAL_STATUS)
+      .range(0, PAGE_SIZE - 1)
+      .order(INITIAL_SORT.column, { ascending: INITIAL_SORT.ascending })
+      .order('id', { ascending: true }),
+    getStatusCounts(supabase, batchId),
+  ]);
 
-  // Sync items from server into local state so we can apply optimistic updates
-  useEffect(() => {
-    if (data && !loading) {
-      setLocalItems(data.items);
-      setCardIndex(0);
-    }
-  }, [data, loading]);
-
-  const { updateItem } = useItemUpdate(
-    useCallback((updated: Item) => {
-      setLocalItems(prev => prev.map(i => i.id === updated.id ? updated : i));
-    }, [])
-  );
-
-  const handleSearch = useCallback((q: string) => {
-    setSearch(q);
-    setPage(1);
-  }, []);
-
-  const handleStatus = useCallback((s: ItemStatus | 'all') => {
-    setStatus(s);
-    setPage(1);
-  }, []);
-
-  const handleSort = useCallback((s: string) => {
-    setSort(s);
-    setPage(1);
-  }, []);
-
-  if (!pinChecked) return null;
-
-  if (!pinVerified && batch) {
-    return (
-      <PinModal
-        batchId={batchId}
-        batchName={batch.name}
-        mode="access"
-        onSuccess={(pin, isMaster) => {
-          setBatchVerified(batchId);
-          storeVerifiedPin(batchId, pin);
-          if (isMaster) setMasterVerified();
-          setPinVerified(true);
-        }}
-        onCancel={() => router.push('/')}
-      />
-    );
-  }
+  if (batchResult.error || !batchResult.data) notFound();
+  const batch = batchResult.data;
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
-      <ReviewHeader
-        batchName={batch?.name ?? '...'}
-        batchId={batchId}
-        reviewed={batch?.reviewed_count ?? 0}
-        total={batch?.item_count ?? 0}
-        view={view}
-        onViewChange={setView}
-      />
-      <div className="max-w-4xl mx-auto px-4 py-4 space-y-4">
-        <SearchFilter onSearch={handleSearch} onStatus={handleStatus} status={status} sort={sort} onSort={handleSort} />
-
-        {loading && (
-          <div className="flex items-center justify-center h-32">
-            <p className="text-gray-400 text-sm">Loading...</p>
-          </div>
-        )}
-
-        {!loading && view === 'card' && (
-          <CardView
-            items={localItems}
-            currentIndex={cardIndex}
-            total={localItems.length}
-            onNavigate={setCardIndex}
-            onUpdate={updateItem}
-          />
-        )}
-
-        {!loading && view === 'table' && (
-          <TableView items={localItems} onUpdate={updateItem} />
-        )}
-
-        {data && data.total > data.pageSize && (
-          <div className="flex items-center justify-center gap-4 pb-4">
-            <button
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className="px-3 py-1 text-sm rounded bg-gray-700 text-white disabled:opacity-40 hover:bg-gray-600 disabled:cursor-not-allowed"
-            >
-              ← Prev
-            </button>
-            <span className="text-sm text-gray-400">
-              Page {page} of {Math.ceil(data.total / data.pageSize)}
-            </span>
-            <button
-              onClick={() => setPage(p => Math.min(Math.ceil(data.total / data.pageSize), p + 1))}
-              disabled={page === Math.ceil(data.total / data.pageSize)}
-              className="px-3 py-1 text-sm rounded bg-gray-700 text-white disabled:opacity-40 hover:bg-gray-600 disabled:cursor-not-allowed"
-            >
-              Next →
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
+    <ReviewClient
+      batch={{
+        id: batch.id,
+        name: batch.name,
+        imported_at: batch.imported_at,
+        has_pin: batch.pin_hash !== null,
+        item_count: totalResult.count ?? 0,
+        reviewed_count: reviewedResult.count ?? 0,
+      }}
+      initialItems={{
+        items: (itemsResult.data ?? []) as Item[],
+        total: itemsResult.count ?? 0,
+        page: 1,
+        pageSize: PAGE_SIZE,
+      }}
+      initialCounts={counts}
+    />
   );
 }

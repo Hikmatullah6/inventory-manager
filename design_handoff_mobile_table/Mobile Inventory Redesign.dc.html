@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><meta name="design_doc_mode" content="canvas"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet"><style>body{margin:0;background:#e9e7e2;font-family:Geist,system-ui,sans-serif}a{color:#60a5fa}a:hover{color:#93c5fd}.noscroll::-webkit-scrollbar{display:none}.noscroll{scrollbar-width:none}@keyframes riseIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}input,textarea,button{font-family:Geist,system-ui,sans-serif}input:focus-visible,textarea:focus-visible,button:focus-visible{outline:2px solid #60a5fa;outline-offset:2px}</style></helmet>
+<div style="padding:44px 48px 60px;display:flex;flex-direction:column;gap:30px">
+
+<div style="display:flex;flex-direction:column;gap:6px;max-width:780px">
+<div style="font:600 11px/1 'Geist Mono',ui-monospace,monospace;letter-spacing:.14em;text-transform:uppercase;color:#6b7280">Redesign · mobile table page</div>
+<h1 style="margin:0;font:700 31px/1.15 Geist,system-ui,sans-serif;color:#18181b">List collapses to a SKU rail; the item takes the screen</h1>
+<p style="margin:0;font:400 15px/1.55 Geist,system-ui,sans-serif;color:#52525b;text-wrap:pretty">Same palette, same status vocabulary, same fields — only the layout moves. Tap any row: the list slides left to a 72px rail of SKUs with status dots, and the detail pane owns the remaining 298px. Arrows step to the next item without going back; ✕ restores the list. Live prototype — click it.</p>
+</div>
+
+<div style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start">
+<div style="display:flex;flex-direction:column;gap:11px">
+<div style="font:600 12px/1 Geist,system-ui,sans-serif;color:#52525b">iPhone 402pt · interactive</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+<div style="height:874px;background:#111827;color:#fff;font-family:Geist,system-ui,sans-serif;padding-top:54px;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden">
+
+  <div style="flex:none;background:#111827;border-bottom:1px solid #374151;padding:10px 16px 12px">
+    <div style="display:flex;align-items:center;gap:10px;min-width:0;margin-bottom:10px">
+      <button style="flex:none;height:44px;padding:0 12px 0 8px;background:none;border:none;color:#9ca3af;font-size:15px;display:inline-flex;align-items:center;gap:4px;cursor:pointer" style-hover="color:#fff">← Back</button>
+      <span style="font-weight:600;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0">March Auction — Chicago</span>
+      <button style="flex:none;height:44px;padding:0 14px;background:#374151;border:none;border-radius:8px;color:#fff;font-size:14px;cursor:pointer" style-hover="background:#4b5563">Export</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div style="flex:1;height:6px;background:#374151;border-radius:9999px;overflow:hidden"><div style="height:100%;width:{{ pct }};background:#3b82f6;border-radius:9999px;transition:width .3s"></div></div>
+      <span style="font-size:14px;color:#9ca3af;white-space:nowrap;flex:none">{{ reviewedLabel }}</span>
+    </div>
+  </div>
+
+  <sc-if value="{{ listMode }}" hint-placeholder-val="{{ true }}">
+    <div style="flex:none;padding:12px 16px 10px;display:flex;flex-direction:column;gap:10px">
+      <div style="position:relative;display:flex;align-items:center">
+        <span style="position:absolute;left:14px;color:#6b7280;font-size:16px;pointer-events:none">⌕</span>
+        <input type="text" value="{{ search }}" onChange="{{ onSearch }}" placeholder="Search title or SKU..." style="width:100%;height:48px;background:#1f2937;border:1px solid #4b5563;border-radius:10px;padding:0 14px 0 38px;box-sizing:border-box;font-size:16px;color:#fff">
+      </div>
+      <div class="noscroll" style="display:flex;gap:8px;overflow-x:auto;margin:0 -16px;padding:2px 16px">
+        <sc-for list="{{ chips }}" as="c" hint-placeholder-count="5">
+          <button onClick="{{ c.on }}" style="flex:none;height:40px;padding:0 14px;border-radius:9999px;font-size:14px;font-weight:500;cursor:pointer;white-space:nowrap;background:{{ c.bg }};color:{{ c.fg }};border:1px solid {{ c.border }}">{{ c.label }}</button>
+        </sc-for>
+      </div>
+    </div>
+    <div style="flex:1;min-height:0;overflow-y:auto;padding:0 16px 20px">
+      <sc-for list="{{ rows }}" as="r" hint-placeholder-count="8">
+        <button onClick="{{ r.on }}" style="width:100%;min-height:64px;display:flex;align-items:center;gap:12px;text-align:left;background:#1f2937;border:1px solid #374151;border-radius:12px;padding:12px 14px;margin-bottom:8px;cursor:pointer;color:#fff" style-hover="background:#263243;border-color:#4b5563">
+          <span style="flex:none;width:10px;height:10px;border-radius:9999px;background:{{ r.dot }}"></span>
+          <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+            <span style="font-size:16px;font-weight:500;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.title }}</span>
+            <span style="display:flex;gap:10px;align-items:baseline">
+              <span style="font-family:'Geist Mono',ui-monospace,monospace;font-size:13px;color:#4ade80">{{ r.sku }}</span>
+              <span style="font-size:13px;color:#9ca3af">{{ r.qtyLabel }}</span>
+            </span>
+          </span>
+          <span style="flex:none;font-size:13px;padding:4px 10px;border-radius:9999px;white-space:nowrap;background:{{ r.badgeBg }};color:{{ r.badgeFg }}">{{ r.badgeLabel }}</span>
+          <span style="flex:none;color:#6b7280;font-size:13px">›</span>
+        </button>
+      </sc-for>
+      <div style="display:flex;align-items:center;justify-content:center;gap:14px;padding:10px 0 4px">
+        <button style="height:44px;padding:0 16px;border-radius:8px;background:#374151;border:none;color:#fff;font-size:14px;cursor:pointer;opacity:.4">← Prev</button>
+        <span style="font-size:14px;color:#9ca3af">Page 1 of 3</span>
+        <button style="height:44px;padding:0 16px;border-radius:8px;background:#374151;border:none;color:#fff;font-size:14px;cursor:pointer" style-hover="background:#4b5563">Next →</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ detailMode }}" hint-placeholder-val="{{ false }}">
+    <div style="flex:1;min-height:0;display:flex">
+
+      <div class="noscroll" ref="{{ railRef }}" style="flex:none;width:72px;border-right:1px solid #374151;overflow-y:auto;background:#0d1521">
+        <sc-for list="{{ rail }}" as="r" hint-placeholder-count="9">
+          <button onClick="{{ r.on }}" style="width:100%;min-height:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;background:{{ r.bg }};border:none;border-left:3px solid {{ r.edge }};border-bottom:1px solid #1f2937;padding:8px 4px;cursor:pointer" style-hover="background:#1f2937">
+            <span style="width:8px;height:8px;border-radius:9999px;background:{{ r.dot }}"></span>
+            <span style="font-family:'Geist Mono',ui-monospace,monospace;font-size:12px;font-weight:500;color:{{ r.skuColor }};line-height:1.1">{{ r.sku }}</span>
+          </button>
+        </sc-for>
+      </div>
+
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+        <div style="flex:none;display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid #374151;background:#111827">
+          <button onClick="{{ onPrev }}" style="flex:none;width:44px;height:44px;border-radius:8px;background:#1f2937;border:1px solid #374151;color:#fff;font-size:17px;cursor:pointer;opacity:{{ prevOpacity }}" style-hover="background:#374151">↑</button>
+          <button onClick="{{ onNext }}" style="flex:none;width:44px;height:44px;border-radius:8px;background:#1f2937;border:1px solid #374151;color:#fff;font-size:17px;cursor:pointer;opacity:{{ nextOpacity }}" style-hover="background:#374151">↓</button>
+          <span style="flex:1;min-width:0;text-align:center;font-size:13px;color:#9ca3af;white-space:nowrap">{{ positionLabel }}</span>
+          <button onClick="{{ onClose }}" style="flex:none;height:44px;padding:0 12px;border-radius:8px;background:#1f2937;border:1px solid #374151;color:#9ca3af;font-size:15px;cursor:pointer" style-hover="color:#fff;background:#374151">✕</button>
+        </div>
+
+        <div class="noscroll" style="flex:1;min-height:0;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:14px;animation:riseIn .22s ease">
+          <div style="width:100%;aspect-ratio:4/3;background:#1f2937;border:1px dashed #4b5563;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:#6b7280">
+            <span style="font-size:26px">🖼</span>
+            <span style="font-family:'Geist Mono',ui-monospace,monospace;font-size:12px">item photo · {{ sel.sku }}</span>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <h2 style="margin:0;font-size:18px;font-weight:600;line-height:1.3;text-wrap:pretty">{{ sel.title }}</h2>
+            <div style="display:flex;flex-wrap:wrap;gap:6px">
+              <span style="font-size:13px;padding:4px 10px;border-radius:9999px;background:#374151;color:#e5e7eb;font-family:'Geist Mono',ui-monospace,monospace">{{ sel.sku }}</span>
+              <span style="font-size:13px;padding:4px 10px;border-radius:9999px;background:#374151;color:#e5e7eb">Cost ${{ sel.cost }}</span>
+            </div>
+            <a href="#" style="display:flex;align-items:center;justify-content:center;height:48px;border-radius:10px;border:1px solid #2563eb;color:#60a5fa;font-size:15px;font-weight:500;text-decoration:none" style-hover="background:#172554">View original listing ↗</a>
+            <p style="margin:0;font-size:14px;line-height:1.5;color:#9ca3af;text-wrap:pretty">{{ sel.description }}</p>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <sc-for list="{{ statusOptions }}" as="s" hint-placeholder-count="6">
+              <button onClick="{{ s.on }}" style="min-height:52px;border-radius:10px;font-size:14px;font-weight:500;cursor:pointer;background:{{ s.bg }};color:{{ s.fg }};border:2px solid {{ s.ring }};padding:6px 4px" style-hover="filter:brightness(1.15)">{{ s.label }}</button>
+            </sc-for>
+          </div>
+
+          <sc-if value="{{ isSold }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;gap:5px">
+              <label style="font-size:13px;color:#9ca3af">Sale Price</label>
+              <input type="number" value="{{ f.sale_price }}" onChange="{{ onField.sale_price }}" placeholder="0.00" style="width:100%;height:48px;background:#1f2937;border:1px solid #4b5563;border-radius:10px;padding:0 12px;box-sizing:border-box;font-size:16px;color:#fff">
+            </div>
+          </sc-if>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px">
+            <div style="min-width:0;display:flex;flex-direction:column;gap:5px">
+              <label style="font-size:12px;color:#9ca3af">Good</label>
+              <input type="number" value="{{ f.qty_good }}" onChange="{{ onField.qty_good }}" style="width:100%;height:48px;background:#1f2937;border:1px solid #4b5563;border-radius:10px;padding:0 8px;box-sizing:border-box;font-size:16px;color:#fff;text-align:center">
+            </div>
+            <div style="min-width:0;display:flex;flex-direction:column;gap:5px">
+              <label style="font-size:12px;color:#9ca3af">Broken</label>
+              <input type="number" value="{{ f.qty_broken }}" onChange="{{ onField.qty_broken }}" style="width:100%;height:48px;background:#1f2937;border:1px solid #4b5563;border-radius:10px;padding:0 8px;box-sizing:border-box;font-size:16px;color:#fff;text-align:center">
+            </div>
+            <div style="min-width:0;display:flex;flex-direction:column;gap:5px">
+              <label style="font-size:12px;color:#9ca3af">Sold</label>
+              <input type="number" value="{{ f.qty_sold }}" onChange="{{ onField.qty_sold }}" style="width:100%;height:48px;background:#1f2937;border:1px solid #4b5563;border-radius:10px;padding:0 8px;box-sizing:border-box;font-size:16px;color:#fff;text-align:center">
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <label style="font-size:13px;color:#9ca3af">Shelf / Location</label>
+            <input type="text" value="{{ f.shelf_location }}" onChange="{{ onField.shelf_location }}" placeholder="e.g. Shelf B2, Back Room" style="width:100%;height:48px;background:#1f2937;border:1px solid #4b5563;border-radius:10px;padding:0 12px;box-sizing:border-box;font-size:16px;color:#fff">
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <label style="font-size:13px;color:#9ca3af">Notes</label>
+            <textarea rows="3" value="{{ f.notes }}" onChange="{{ onField.notes }}" placeholder="Any notes..." style="width:100%;background:#1f2937;border:1px solid #4b5563;border-radius:10px;padding:10px 12px;box-sizing:border-box;font-size:16px;color:#fff;resize:none"></textarea>
+          </div>
+
+          <div style="height:26px"></div>
+        </div>
+
+        <sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}">
+          <div style="flex:none;margin:0 10px 10px;display:flex;align-items:center;gap:8px;background:#172554;border:1px solid #2563eb;border-radius:10px;padding:8px 10px">
+            <span style="flex:1;min-width:0;font-size:13px;font-weight:500;color:#dbeafe;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Saved · {{ toast }}</span>
+            <button onClick="{{ onUndo }}" style="flex:none;height:36px;padding:0 12px;border-radius:8px;background:none;border:1px solid #2563eb;color:#93c5fd;font-size:13px;font-weight:500;cursor:pointer" style-hover="background:#1e3a8a">Undo</button>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-import>
+</div>
+
+<div style="width:330px;display:flex;flex-direction:column;gap:22px;padding-top:34px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<div style="font:600 13px/1 Geist,system-ui,sans-serif;color:#18181b">How it works</div>
+<sc-for list="{{ notes }}" as="n" hint-placeholder-count="6">
+<div style="display:flex;gap:10px;font:400 13.5px/1.5 Geist,system-ui,sans-serif;color:#3f3f46">
+<span style="flex:none;width:18px;height:18px;border-radius:9999px;background:#18181b;color:#fff;font:600 10px/18px 'Geist Mono',monospace;text-align:center;margin-top:1px">{{ n.n }}</span>
+<span style="text-wrap:pretty">{{ n.text }}</span>
+</div>
+</sc-for>
+</div>
+<div style="display:flex;flex-direction:column;gap:9px">
+<div style="font:600 13px/1 Geist,system-ui,sans-serif;color:#18181b">Unchanged</div>
+<p style="margin:0;font:400 13.5px/1.55 Geist,system-ui,sans-serif;color:#52525b;text-wrap:pretty">Every colour, status label, field and API call. Desktop keeps the existing side-by-side table and panel — this layout applies below the <span style="font-family:'Geist Mono',monospace;font-size:12.5px">sm:</span> breakpoint only.</p>
+</div>
+</div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1240,&quot;height&quot;:1060}}">
+const STATUS = {
+  pending:      { bg: '#a16207', fg: '#fef9c3', label: '⏳ Pending',      dot: '#facc15', short: 'Pending' },
+  have_it:      { bg: '#15803d', fg: '#dcfce7', label: '✓ Have It',       dot: '#4ade80', short: 'Have It' },
+  dont_have:    { bg: '#4b5563', fg: '#e5e7eb', label: "✗ Don't Have",    dot: '#9ca3af', short: "Don't Have" },
+  broken:       { bg: '#b91c1c', fg: '#fee2e2', label: '⚠ Broken',        dot: '#f87171', short: 'Broken' },
+  partial:      { bg: '#c2410c', fg: '#ffedd5', label: '⅟ Partial',       dot: '#fb923c', short: 'Partial' },
+  sold:         { bg: '#1d4ed8', fg: '#dbeafe', label: '$ Sold',          dot: '#60a5fa', short: 'Sold' },
+  personal_use: { bg: '#7e22ce', fg: '#f3e8ff', label: '♥ Personal Use',  dot: '#c084fc', short: 'Personal Use' },
+};
+const ORDER = ['have_it', 'dont_have', 'broken', 'partial', 'sold', 'personal_use'];
+
+const ITEMS = [
+  ['A-1001', 'DeWalt 20V MAX Cordless Drill Kit', 'have_it', 42, 'Includes drill/driver with 2 lithium-ion batteries and charger. Lightly used.'],
+  ['A-1002', 'Samsung 55" 4K Smart TV', 'pending', 185, 'Minor scuff on bezel. Remote included. Powers on and displays correctly.'],
+  ['A-1003', 'KitchenAid Stand Mixer 5qt', 'pending', 95, 'Tilt-head mixer in red. Bowl and dough hook present. Motor works.'],
+  ['A-1004', 'Apple iPad 9th Gen 64GB', 'broken', 38, 'Cracked screen. Boots and connects to Wi-Fi. No charger included.'],
+  ['A-1005', 'Dyson V11 Cordless Vacuum', 'partial', 110, 'Missing one attachment. Battery holds charge. Suction strong.'],
+  ['A-1006', 'Instant Pot Duo 8qt Pressure Cooker', 'sold', 28, 'New in open box. All accessories present.'],
+  ['A-1007', 'Ninja Air Fryer XL 5.5qt', 'pending', 22, 'Used. Basket has minor staining. Heats up and timer works.'],
+  ['A-1008', 'Shark Navigator Upright Vacuum', 'dont_have', 34, 'Listed with hose and two attachments.'],
+  ['A-1009', 'Keurig K-Elite Coffee Maker', 'pending', 31, 'Brews. Water reservoir has hairline scratch.'],
+  ['A-1010', 'Bissell CrossWave Wet Dry Vac', 'pending', 57, 'Tank present. Cord intact. Not tested under water.'],
+].map(([sku, title, status, cost, description], i) => ({
+  id: 'i' + i, sku, title, status, cost, description,
+  qty_good: status === 'have_it' || status === 'partial' ? 1 : status === 'pending' ? null : 0,
+  qty_broken: status === 'broken' ? 1 : 0,
+  qty_sold: status === 'sold' ? 1 : 0,
+  shelf_location: status === 'have_it' ? 'Shelf B2' : '',
+  notes: '',
+  sale_price: status === 'sold' ? 74 : '',
+}));
+
+const FIELDS = ['qty_good', 'qty_broken', 'qty_sold', 'shelf_location', 'notes', 'sale_price'];
+
+class Component extends DCLogic {
+  state = {
+    selectedId: null,
+    filter: 'all',
+    search: '',
+    items: ITEMS.map(i => ({ ...i })),
+    toast: null,
+    prev: null,
+  };
+
+  railRef = React.createRef();
+
+  componentWillUnmount() { clearTimeout(this._t); }
+
+  componentDidUpdate(prev) {
+    if (prev.__ || this.state.selectedId === this._lastSel) return;
+    this._lastSel = this.state.selectedId;
+    const el = this.railRef.current;
+    if (!el) return;
+    const at = this.visible().findIndex(i => i.id === this.state.selectedId);
+    if (at < 0) return;
+    const row = 57, top = at * row;
+    if (top < el.scrollTop || top + row > el.scrollTop + el.clientHeight) {
+      el.scrollTop = Math.max(0, top - el.clientHeight / 2 + row / 2);
+    }
+  }
+
+  visible() {
+    const { items, filter, search } = this.state;
+    const q = search.trim().toLowerCase();
+    return items.filter(i =>
+      (filter === 'all' || i.status === filter) &&
+      (!q || i.title.toLowerCase().includes(q) || i.sku.toLowerCase().includes(q))
+    );
+  }
+
+  select(id) { this.setState({ selectedId: id, toast: null, prev: null }); }
+
+  step(d) {
+    const list = this.visible();
+    const at = list.findIndex(i => i.id === this.state.selectedId);
+    const next = list[at + d];
+    if (next) this.select(next.id);
+  }
+
+  setStatus(id, status) {
+    const before = this.state.items.find(i => i.id === id).status;
+    this.setState(s => ({
+      items: s.items.map(i => i.id === id ? { ...i, status } : i),
+      toast: STATUS[status].short,
+      prev: { id, status: before },
+    }));
+    clearTimeout(this._t);
+    this._t = setTimeout(() => this.setState({ toast: null, prev: null }), 4000);
+  }
+
+  undo() {
+    const p = this.state.prev;
+    if (!p) return;
+    clearTimeout(this._t);
+    this.setState(s => ({
+      items: s.items.map(i => i.id === p.id ? { ...i, status: p.status } : i),
+      toast: null, prev: null,
+    }));
+  }
+
+  setField(id, field, value) {
+    this.setState(s => ({ items: s.items.map(i => i.id === id ? { ...i, [field]: value } : i) }));
+  }
+
+  renderVals() {
+    const { items, selectedId, filter, search, toast } = this.state;
+    const list = this.visible();
+    const sel = items.find(i => i.id === selectedId) || null;
+    const reviewed = items.filter(i => i.status !== 'pending').length;
+
+    const chips = [{ value: 'all', label: 'All · ' + items.length }].concat(
+      ['pending'].concat(ORDER).map(v => ({
+        value: v,
+        label: STATUS[v].label + ' · ' + items.filter(i => i.status === v).length,
+      }))
+    ).map(c => ({
+      label: c.label,
+      on: () => this.setState({ filter: c.value }),
+      bg: filter === c.value ? '#2563eb' : '#1f2937',
+      fg: filter === c.value ? '#fff' : '#e5e7eb',
+      border: filter === c.value ? '#2563eb' : '#4b5563',
+    }));
+
+    const rows = list.map(i => {
+      const s = STATUS[i.status];
+      return {
+        sku: i.sku, title: i.title, dot: s.dot,
+        badgeBg: s.bg, badgeFg: s.fg, badgeLabel: s.short,
+        qtyLabel: i.qty_good == null ? 'not counted' : 'good ' + i.qty_good + ' · sold ' + i.qty_sold,
+        on: () => this.select(i.id),
+      };
+    });
+
+    const rail = list.map(i => {
+      const on = i.id === selectedId;
+      return {
+        sku: i.sku, dot: STATUS[i.status].dot,
+        bg: on ? '#172554' : 'transparent',
+        edge: on ? '#3b82f6' : 'transparent',
+        skuColor: on ? '#93c5fd' : '#4ade80',
+        on: () => this.select(i.id),
+      };
+    });
+
+    const at = list.findIndex(i => i.id === selectedId);
+    const f = {}; const onField = {};
+    FIELDS.forEach(k => {
+      f[k] = sel ? (sel[k] == null ? '' : String(sel[k])) : '';
+      onField[k] = e => this.setField(selectedId, k, e.target.value);
+    });
+
+    return {
+      listMode: !sel, detailMode: !!sel, sel: sel || {},
+      pct: Math.round((reviewed / items.length) * 100) + '%',
+      reviewedLabel: reviewed + ' / ' + items.length + ' reviewed',
+      search, onSearch: e => this.setState({ search: e.target.value }),
+      chips, rows, rail, f, onField, railRef: this.railRef,
+      isSold: !!sel && sel.status === 'sold',
+      positionLabel: sel ? at + 1 + ' of ' + list.length : '',
+      prevOpacity: at > 0 ? 1 : 0.35,
+      nextOpacity: at > -1 && at < list.length - 1 ? 1 : 0.35,
+      onPrev: () => this.step(-1),
+      onNext: () => this.step(1),
+      onClose: () => this.setState({ selectedId: null, toast: null, prev: null }),
+      toast, onUndo: () => this.undo(),
+      statusOptions: ORDER.map(v => {
+        const s = STATUS[v];
+        const on = !!sel && sel.status === v;
+        return {
+          label: s.label, on: () => this.setStatus(selectedId, v),
+          bg: on ? s.bg : '#374151', fg: on ? s.fg : '#fff',
+          ring: on ? '#fff' : 'transparent',
+        };
+      }),
+      notes: [
+        'List state replaces the 5-column table with full-width 64px rows: status dot, title, SKU in green mono, counts, status pill. Nothing scrolls sideways.',
+        'The two dropdowns become a scrolling chip row with live counts, so the current filter is readable without opening a menu.',
+        'Tapping a row collapses the list to a 72px rail: status dot over the SKU, 56px tall. The selected row is blue-950 with a 3px blue edge — the same highlight the table uses today.',
+        'The detail pane gets 298px and carries every field ItemDetail has now: photo, title, cost, listing link, description, the 2×3 status grid, sale price when sold, three quantities, shelf, notes.',
+        '↑ ↓ step through the filtered list in place; the rail scrolls the selection into view. ✕ returns to the full list.',
+        'Tapping a status shows a Saved · {status} bar with Undo for 4 seconds. It does not auto-advance — he sets quantities and shelf after choosing.',
+      ].map((text, i) => ({ n: i + 1, text })),
+    };
+  }
+}
+</script>
+</body>
+</html>
