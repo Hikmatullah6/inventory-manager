@@ -8,7 +8,9 @@ export interface AuctionBatch {
   imported_at: string;
   item_count: number;
   reviewed_count: number;
-  pin_hash: string | null;
+  /** Whether a PIN is set. The hash itself stays server-side — a 4-digit
+   *  PIN's SHA-256 is exhaustively crackable offline in milliseconds. */
+  has_pin: boolean;
 }
 
 export interface Item {

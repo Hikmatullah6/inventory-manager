@@ -10,21 +10,22 @@ import {
 interface PinGateProps {
   batchId: string;
   batchName: string;
-  pinHash: string | null;
+  /** Whether this batch is PIN-protected. The hash stays on the server. */
+  hasPin: boolean;
   children: React.ReactNode;
 }
 
-export default function PinGate({ batchId, batchName, pinHash, children }: PinGateProps) {
+export default function PinGate({ batchId, batchName, hasPin, children }: PinGateProps) {
   const [verified, setVerified] = useState(false);
   const [checking, setChecking] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
-    if (!pinHash || isBatchVerified(batchId) || isMasterVerified()) {
+    if (!hasPin || isBatchVerified(batchId) || isMasterVerified()) {
       setVerified(true);
     }
     setChecking(false);
-  }, [batchId, pinHash]);
+  }, [batchId, hasPin]);
 
   if (checking) return null;
 
