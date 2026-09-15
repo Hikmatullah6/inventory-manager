@@ -31,7 +31,12 @@ export async function GET(req: NextRequest) {
     sku_desc:         { column: 'sku',         ascending: false },
   };
   const { column, ascending } = sortMap[sort] ?? sortMap['date_bought_asc'];
-  query = query.range(from, from + pageSize - 1).order(column, { ascending });
+  query = query
+    .range(from, from + pageSize - 1)
+    .order(column, { ascending })
+    // Ties (null date_bought, identical timestamps) would otherwise page
+    // non-deterministically and the same item could appear twice.
+    .order('id', { ascending: true });
 
   const { data, count, error } = await query;
 

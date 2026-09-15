@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AuctionBatch } from '@/lib/types';
 import PinModal from '@/components/PinModal';
@@ -16,21 +16,15 @@ type PinModalState = {
   destination?: string;
 } | null;
 
-export default function BatchList() {
-  const [batches, setBatches] = useState<AuctionBatch[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function BatchList({ initialBatches }: { initialBatches: AuctionBatch[] }) {
+  // Rendered by the server — no fetch on mount, no empty flash.
+  const [batches, setBatches] = useState<AuctionBatch[]>(initialBatches);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [pinModal, setPinModal] = useState<PinModalState>(null);
   const router = useRouter();
 
-  useEffect(() => {
-    fetch('/api/batches')
-      .then(r => r.json())
-      .then((data: AuctionBatch[]) => { setBatches(data); setLoading(false); });
-  }, []);
-
   function handleNavigate(batch: AuctionBatch, destination: string) {
-    if (!batch.pin_hash || isBatchVerified(batch.id) || isMasterVerified()) {
+    if (!batch.has_pin || isBatchVerified(batch.id) || isMasterVerified()) {
       router.push(destination);
       return;
     }
@@ -40,7 +34,7 @@ export default function BatchList() {
   async function executeDeletion(batchId: string) {
     setDeleting(batchId);
     const batch = batches.find(b => b.id === batchId);
-    const pin = batch?.pin_hash ? (getVerifiedPin(batchId) ?? '') : undefined;
+    const pin = batch?.has_pin ? (getVerifiedPin(batchId) ?? '') : undefined;
     const res = await fetch(`/api/batches/${batchId}`, {
       method: 'DELETE',
       ...(pin !== undefined
@@ -55,7 +49,7 @@ export default function BatchList() {
 
   async function handleDelete(batch: AuctionBatch) {
     if (!confirm(`Delete "${batch.name}" and all its items? This cannot be undone.`)) return;
-    if (batch.pin_hash && !isBatchVerified(batch.id) && !isMasterVerified()) {
+    if (batch.has_pin && !isBatchVerified(batch.id) && !isMasterVerified()) {
       setPinModal({ batchId: batch.id, batchName: batch.name, mode: 'delete' });
       return;
     }
@@ -76,7 +70,6 @@ export default function BatchList() {
     }
   }
 
-  if (loading) return null;
   if (!batches.length) return null;
 
   return (
@@ -97,7 +90,7 @@ export default function BatchList() {
             <div className="min-w-0">
               <p className="font-medium text-sm truncate">
                 {batch.name}
-                {batch.pin_hash && <span className="ml-2 text-xs text-gray-500">🔒</span>}
+                {batch.has_pin && <span className="ml-2 text-xs text-gray-500">🔒</span>}
               </p>
               <p className="text-xs text-gray-400 mt-0.5">
                 {batch.reviewed_count} / {batch.item_count} reviewed ·{' '}
@@ -107,20 +100,20 @@ export default function BatchList() {
             <div className="flex gap-2 flex-shrink-0">
               <button
                 onClick={() => handleNavigate(batch, `/review/${batch.id}`)}
-                className="px-3 py-1.5 bg-blue-700 hover:bg-blue-600 rounded-lg text-xs font-medium transition-colors"
+                className="px-3 min-h-11 inline-flex items-center bg-blue-700 hover:bg-blue-600 rounded-lg text-sm font-medium transition-colors"
               >
                 Review
               </button>
               <button
                 onClick={() => handleNavigate(batch, `/export/${batch.id}`)}
-                className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-xs font-medium transition-colors"
+                className="px-3 min-h-11 inline-flex items-center bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-medium transition-colors"
               >
                 Export
               </button>
               <button
                 onClick={() => handleDelete(batch)}
                 disabled={deleting === batch.id}
-                className="px-3 py-1.5 bg-red-900 hover:bg-red-700 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 min-h-11 inline-flex items-center bg-red-900 hover:bg-red-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {deleting === batch.id ? '…' : 'Delete'}
               </button>

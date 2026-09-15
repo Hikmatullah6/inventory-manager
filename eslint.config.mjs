@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Not our source: scratch git worktrees created by tooling, and the design
+    // prototypes shipped with the redesign handoff.
+    ".claude/**",
+    "design_handoff_*/**",
   ]),
 ]);
 
