@@ -76,14 +76,14 @@ export default function PinModal({ batchId, batchName, mode, onSuccess, onCancel
               type="button"
               onClick={onCancel}
               disabled={loading}
-              className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm disabled:opacity-50"
+              className="flex-1 px-4 min-h-11 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading || pin.length !== 4}
-              className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed
+              className={`flex-1 px-4 min-h-11 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed
                 ${mode === 'delete'
                   ? 'bg-red-700 hover:bg-red-600'
                   : 'bg-blue-700 hover:bg-blue-600'

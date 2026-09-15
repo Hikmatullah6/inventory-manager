@@ -21,7 +21,7 @@ export default function CardView({ items, currentIndex, total, onNavigate, onUpd
 
   return (
     <div className="space-y-4">
-      <ItemDetail item={item} onUpdate={onUpdate} />
+      <ItemDetail key={item.id} item={item} onUpdate={onUpdate} />
 
       <div className="flex items-center justify-between pt-2 border-t border-gray-700">
         <button
@@ -31,7 +31,7 @@ export default function CardView({ items, currentIndex, total, onNavigate, onUpd
         >
           ← Prev
         </button>
-        <span className="text-xs text-gray-500">{currentIndex + 1} of {total}</span>
+        <span className="text-sm text-gray-500">{currentIndex + 1} of {total}</span>
         <button
           onClick={() => onNavigate(currentIndex + 1)}
           disabled={currentIndex >= total - 1}

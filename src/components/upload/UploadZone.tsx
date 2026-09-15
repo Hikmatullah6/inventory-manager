@@ -94,7 +94,7 @@ export default function UploadZone() {
         />
         <button
           type="button"
-          className="mt-2 px-4 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-xs"
+          className="mt-2 px-4 min-h-11 inline-flex items-center bg-gray-700 hover:bg-gray-600 rounded-lg text-sm"
           onClick={e => { e.stopPropagation(); fileRef.current?.click(); }}
         >
           {selectedFile ? 'Change File' : 'Choose File'}
@@ -108,7 +108,7 @@ export default function UploadZone() {
           value={batchName}
           onChange={e => setBatchName(e.target.value)}
           placeholder="e.g. April Auction – BidSpotter (optional)"
-          className="flex-1 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+          className="flex-1 min-h-11 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-base focus:outline-none focus:border-blue-400"
         />
       </div>
 
@@ -122,7 +122,7 @@ export default function UploadZone() {
             placeholder="4-digit PIN (optional)"
             maxLength={4}
             inputMode="numeric"
-            className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
+            className="w-full min-h-11 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-base focus:outline-none focus:border-blue-400"
           />
           <p className="text-xs text-gray-500">Leave blank for no PIN protection</p>
         </div>
@@ -131,7 +131,7 @@ export default function UploadZone() {
       <button
         type="submit"
         disabled={!selectedFile || loading}
-        className="w-full py-2.5 bg-blue-700 hover:bg-blue-600 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-xl text-sm font-medium transition-colors"
+        className="w-full min-h-11 py-2.5 bg-blue-700 hover:bg-blue-600 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-xl text-sm font-medium transition-colors"
       >
         {loading ? 'Importing…' : 'Submit'}
       </button>

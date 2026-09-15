@@ -31,7 +31,7 @@ export default function ExportButtons({ batchId, inventoryCount, soldCount, pers
             key={tab.id}
             type="button"
             onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
+            className={`flex-1 rounded-lg min-h-11 text-sm font-medium transition-colors ${
               activeTab === tab.id
                 ? 'bg-gray-700 text-white'
                 : 'text-gray-400 hover:text-white'
