@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServer } from '@/lib/supabase-server';
+import { denyUnlessBatchAccess } from '@/lib/batch-access';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
@@ -15,6 +16,10 @@ export async function GET(req: NextRequest) {
   }
 
   const supabase = getSupabaseServer();
+
+  const denied = await denyUnlessBatchAccess(req, supabase, batchId);
+  if (denied) return denied;
+
   let query = supabase
     .from('items')
     .select('*', { count: 'exact' })

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServer } from '@/lib/supabase-server';
 import { parseAuctionCSV } from '@/lib/csv-parser';
 import { hashPin } from '@/lib/pin';
+import { grantBatchAccess } from '@/lib/batch-access';
 
 export async function POST(req: NextRequest) {
   try {
@@ -66,13 +67,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Failed to insert items: ${itemsError.message}` }, { status: 500 });
     }
 
-    return NextResponse.json({
+    const res = NextResponse.json({
       batch,
       imported: rows.length,
       skipped: errors.filter(e => e.row > 0).length,
       errors: errors.filter(e => e.row > 0),
       duplicateSKUs,
     });
+    // The uploader just chose this PIN — don't make them enter it to export.
+    grantBatchAccess(res, batch.id);
+    return res;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: `Unexpected server error: ${message}` }, { status: 500 });

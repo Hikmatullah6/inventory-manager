@@ -1,6 +1,8 @@
 // src/app/review/[batchId]/page.tsx
 import { notFound } from 'next/navigation';
+import { cookies } from 'next/headers';
 import { getSupabaseServer } from '@/lib/supabase-server';
+import { hasBatchAccess } from '@/lib/batch-access';
 import { getStatusCounts } from '@/lib/item-counts';
 import ReviewClient from '@/components/review/ReviewClient';
 import type { Item } from '@/lib/types';
@@ -35,6 +37,12 @@ export default async function ReviewPage({ params }: { params: Promise<{ batchId
   if (batchResult.error || !batchResult.data) notFound();
   const batch = batchResult.data;
 
+  // The gate is in the browser, but the rows are rendered here — so a locked
+  // batch must not have its items in the HTML at all. They are fetched above
+  // (in parallel, off the critical path) and simply never leave the server;
+  // ReviewClient refetches them itself once the PIN is entered.
+  const unlockedHere = hasBatchAccess(await cookies(), batchId, batch.pin_hash);
+
   return (
     <ReviewClient
       batch={{
@@ -45,13 +53,13 @@ export default async function ReviewPage({ params }: { params: Promise<{ batchId
         item_count: totalResult.count ?? 0,
         reviewed_count: reviewedResult.count ?? 0,
       }}
-      initialItems={{
+      initialItems={unlockedHere ? {
         items: (itemsResult.data ?? []) as Item[],
         total: itemsResult.count ?? 0,
         page: 1,
         pageSize: PAGE_SIZE,
-      }}
-      initialCounts={counts}
+      } : null}
+      initialCounts={unlockedHere ? counts : null}
     />
   );
 }

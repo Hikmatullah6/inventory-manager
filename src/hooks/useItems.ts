@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ItemStatus, ItemsQueryResult } from '@/lib/types';
 
 interface UseItemsOptions {
@@ -10,22 +10,23 @@ interface UseItemsOptions {
   page: number;
   /** First page, already fetched on the server. */
   initialData?: ItemsQueryResult | null;
+  /** False while the batch is still locked — /api/items would only 401. */
+  enabled?: boolean;
 }
 
-function queryKey(o: Omit<UseItemsOptions, 'initialData'>) {
+function queryKey(o: Omit<UseItemsOptions, 'initialData' | 'enabled'>) {
   return `${o.batchId}|${o.search}|${o.status}|${o.sort}|${o.page}`;
 }
 
 export function useItems(options: UseItemsOptions) {
-  const { batchId, search, status, sort, page, initialData } = options;
+  const { batchId, search, status, sort, page, initialData, enabled = true } = options;
   const [data, setData] = useState<ItemsQueryResult | null>(initialData ?? null);
 
-  // The view the server already rendered. Refetching it on mount would throw
-  // away that work and show a spinner over data that is already correct.
-  const seededKey = useRef(initialData ? queryKey(options) : null);
   const key = queryKey(options);
-  const [loadedKey, setLoadedKey] = useState<string | null>(seededKey.current);
-  const loading = loadedKey !== key;
+  // Seeded with the view the server already rendered. Refetching that on mount
+  // would throw the work away and show a spinner over correct data.
+  const [loadedKey, setLoadedKey] = useState<string | null>(initialData ? key : null);
+  const loading = enabled && loadedKey !== key;
 
   const fetchItems = useCallback(async () => {
     const params = new URLSearchParams({ batchId, page: String(page), status, sort });
@@ -36,9 +37,9 @@ export function useItems(options: UseItemsOptions) {
   }, [batchId, search, status, sort, page]);
 
   useEffect(() => {
-    if (key === seededKey.current) return;
+    if (!enabled || key === loadedKey) return;
     fetchItems();
-  }, [fetchItems, key]);
+  }, [enabled, fetchItems, key, loadedKey]);
 
   return { data, loading, refetch: fetchItems };
 }

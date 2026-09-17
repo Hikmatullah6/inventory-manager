@@ -61,7 +61,7 @@ export default function BatchList({ initialBatches }: { initialBatches: AuctionB
     const { batchId, mode, destination } = pinModal;
     setBatchVerified(batchId);
     storeVerifiedPin(batchId, pin);
-    if (isMaster) setMasterVerified();
+    if (isMaster) setMasterVerified(pin);
     setPinModal(null);
     if (mode === 'access' && destination) {
       router.push(destination);

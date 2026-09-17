@@ -1,6 +1,8 @@
 // src/app/export/[batchId]/page.tsx
 import { notFound } from 'next/navigation';
+import { cookies } from 'next/headers';
 import { getSupabaseServer } from '@/lib/supabase-server';
+import { hasBatchAccess } from '@/lib/batch-access';
 import Link from 'next/link';
 import ExportStats from '@/components/export/ExportStats';
 import ExportButtons from '@/components/export/ExportButtons';
@@ -31,15 +33,23 @@ export default async function ExportPage({ params }: { params: Promise<{ batchId
   const batch = batchResult.data;
   if (batchResult.error || !batch) notFound();
 
+  // Counts are a summary of the batch, so they wait for the PIN too. PinGate
+  // refreshes this page once it is entered.
+  const unlockedHere = hasBatchAccess(await cookies(), batchId, batch.pin_hash);
   const counts = Object.fromEntries(
-    VALID_STATUSES.map((status, i) => [status, counted[i].count ?? 0])
+    VALID_STATUSES.map((status, i) => [status, unlockedHere ? (counted[i].count ?? 0) : 0])
   ) as Record<ItemStatus, number>;
   const total = VALID_STATUSES.reduce((sum, status) => sum + counts[status], 0);
 
   const exportCount = counts.have_it + counts.broken + counts.partial;
 
   return (
-    <PinGate batchId={batchId} batchName={batch.name} hasPin={batch.pin_hash !== null}>
+    <PinGate
+      batchId={batchId}
+      batchName={batch.name}
+      hasPin={batch.pin_hash !== null}
+      serverLocked={!unlockedHere}
+    >
       <div className="min-h-screen bg-gray-900 text-white">
         <div className="max-w-2xl mx-auto px-4 py-10 space-y-8">
           <div>

@@ -1,6 +1,7 @@
 const VERIFIED_BATCHES_KEY = 'verified_batches';
 const VERIFIED_PINS_KEY = 'verified_pins';
 const MASTER_VERIFIED_KEY = 'master_verified';
+const MASTER_PIN_KEY = 'master_pin';
 
 export function isMasterVerified(): boolean {
   try {
@@ -8,8 +9,20 @@ export function isMasterVerified(): boolean {
   } catch { return false; }
 }
 
-export function setMasterVerified(): void {
-  try { sessionStorage.setItem(MASTER_VERIFIED_KEY, 'true'); } catch {}
+/**
+ * Keeps the master PIN itself, not just the flag: the export cookie is minted
+ * by re-checking a PIN server-side, and a master holder may never have entered
+ * the PIN of the batch they are exporting.
+ */
+export function setMasterVerified(pin?: string): void {
+  try {
+    sessionStorage.setItem(MASTER_VERIFIED_KEY, 'true');
+    if (pin) sessionStorage.setItem(MASTER_PIN_KEY, pin);
+  } catch {}
+}
+
+export function getMasterPin(): string | null {
+  try { return sessionStorage.getItem(MASTER_PIN_KEY); } catch { return null; }
 }
 
 export function isBatchVerified(batchId: string): boolean {

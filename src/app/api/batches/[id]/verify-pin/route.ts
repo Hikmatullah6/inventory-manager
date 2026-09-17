@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServer } from '@/lib/supabase-server';
 import { verifyPin } from '@/lib/pin';
+import { grantBatchAccess } from '@/lib/batch-access';
 
 export async function POST(
   req: NextRequest,
@@ -34,5 +35,10 @@ export async function POST(
     return NextResponse.json({ error: 'Incorrect PIN' }, { status: 401 });
   }
 
-  return NextResponse.json({ ok: true, master: pin === process.env.MASTER_PIN });
+  // The cookie is what lets the export links — plain navigations that carry no
+  // header of ours — prove the PIN was entered.
+  const isMaster = pin === process.env.MASTER_PIN;
+  const res = NextResponse.json({ ok: true, master: isMaster });
+  grantBatchAccess(res, id, isMaster);
+  return res;
 }

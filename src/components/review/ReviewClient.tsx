@@ -2,7 +2,7 @@
 import { useState, useCallback, useEffect, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import { AuctionBatch, Item, ItemStatus, ItemUpdate, ItemsQueryResult } from '@/lib/types';
-import type { StatusCounts } from '@/lib/item-counts';
+import { EMPTY_COUNTS, type StatusCounts } from '@/lib/item-counts';
 import { useItems } from '@/hooks/useItems';
 import { useItemUpdate } from '@/hooks/useItemUpdate';
 import ReviewHeader from '@/components/review/ReviewHeader';
@@ -13,6 +13,7 @@ import PinModal from '@/components/PinModal';
 import {
   isBatchVerified, isMasterVerified,
   setBatchVerified, storeVerifiedPin, setMasterVerified,
+  getVerifiedPin, getMasterPin,
 } from '@/lib/session';
 
 /** useSyncExternalStore needs a subscribe function; this value never changes. */
@@ -20,10 +21,11 @@ const subscribeNever = () => () => {};
 
 interface Props {
   batch: AuctionBatch;
-  /** First page of items, rendered on the server. */
-  initialItems: ItemsQueryResult;
-  /** Totals behind each filter chip, counted on the server. */
-  initialCounts: StatusCounts;
+  /** First page of items, rendered on the server — null while the batch is
+   *  locked, so a protected batch's rows never reach the HTML. */
+  initialItems: ItemsQueryResult | null;
+  /** Totals behind each filter chip, counted on the server. Null when locked. */
+  initialCounts: StatusCounts | null;
 }
 
 export default function ReviewClient({ batch, initialItems, initialCounts }: Props) {
@@ -35,10 +37,11 @@ export default function ReviewClient({ batch, initialItems, initialCounts }: Pro
   const [sort, setSort] = useState('date_bought_asc');
   const [page, setPage] = useState(1);
   const [cardIndex, setCardIndex] = useState(0);
-  const [localItems, setLocalItems] = useState<Item[]>(initialItems.items);
-  const [counts, setCounts] = useState<StatusCounts>(initialCounts);
+  const [localItems, setLocalItems] = useState<Item[]>(initialItems?.items ?? []);
+  const [counts, setCounts] = useState<StatusCounts>(initialCounts ?? EMPTY_COUNTS);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [unlocked, setUnlocked] = useState(false);
+  const [reminted, setReminted] = useState(false);
 
   // The verification cache lives in sessionStorage, which does not exist on the
   // server, so the gate can only be evaluated once hydrated. Read through
@@ -46,7 +49,36 @@ export default function ReviewClient({ batch, initialItems, initialCounts }: Pro
   // flash of the PIN prompt at someone who already unlocked this batch.
   const hydrated = useSyncExternalStore(subscribeNever, () => true, () => false);
 
-  const { data, loading } = useItems({ batchId, search, status, sort, page, initialData: initialItems });
+  // The server withheld the items, so this browser holds no valid PIN cookie —
+  // even if this tab remembers unlocking the batch. A tab that unlocked it
+  // before the cookie existed still has the PIN and can mint one silently;
+  // one that doesn't gets the prompt rather than an empty screen.
+  const serverLocked = batch.has_pin && initialItems === null;
+  const storedPin = hydrated && batch.has_pin ? (getVerifiedPin(batchId) ?? getMasterPin()) : null;
+  const sessionVerified = hydrated && (isBatchVerified(batchId) || isMasterVerified());
+  const pinVerified =
+    hydrated && (unlocked || !batch.has_pin || (sessionVerified && (!serverLocked || storedPin !== null)));
+
+  const needsRemint = pinVerified && serverLocked && !unlocked;
+  useEffect(() => {
+    if (!needsRemint || !storedPin) return;
+    let cancelled = false;
+    fetch(`/api/batches/${batchId}/verify-pin`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: storedPin }),
+    })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setReminted(true); });
+    return () => { cancelled = true; };
+  }, [needsRemint, storedPin, batchId]);
+
+  // Nothing may be fetched until the server would recognise us.
+  const canLoad = pinVerified && (!needsRemint || reminted);
+
+  const { data, loading } = useItems({
+    batchId, search, status, sort, page, initialData: initialItems, enabled: canLoad,
+  });
 
   // Sync items from server into local state so we can apply optimistic updates
   useEffect(() => {
@@ -60,6 +92,7 @@ export default function ReviewClient({ batch, initialItems, initialCounts }: Pro
   // search term changes — the loaded page is 50 rows and cannot be tallied for
   // an answer about thousands. `search` is already debounced by SearchFilter.
   useEffect(() => {
+    if (!canLoad) return;
     let cancelled = false;
     const params = new URLSearchParams({ batchId });
     if (search) params.set('search', search);
@@ -68,9 +101,10 @@ export default function ReviewClient({ batch, initialItems, initialCounts }: Pro
       .then((next: StatusCounts | null) => { if (!cancelled && next) setCounts(next); })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [batchId, search]);
+  }, [batchId, search, canLoad]);
 
   const { updateItem } = useItemUpdate(
+    batchId,
     useCallback((updated: Item) => {
       setLocalItems(prev => prev.map(i => i.id === updated.id ? updated : i));
     }, [])
@@ -108,9 +142,6 @@ export default function ReviewClient({ batch, initialItems, initialCounts }: Pro
 
   if (!hydrated) return null;
 
-  const pinVerified =
-    unlocked || !batch.has_pin || isBatchVerified(batchId) || isMasterVerified();
-
   if (!pinVerified) {
     return (
       <PinModal
@@ -120,7 +151,7 @@ export default function ReviewClient({ batch, initialItems, initialCounts }: Pro
         onSuccess={(pin, isMaster) => {
           setBatchVerified(batchId);
           storeVerifiedPin(batchId, pin);
-          if (isMaster) setMasterVerified();
+          if (isMaster) setMasterVerified(pin);
           setUnlocked(true);
         }}
         onCancel={() => router.push('/')}

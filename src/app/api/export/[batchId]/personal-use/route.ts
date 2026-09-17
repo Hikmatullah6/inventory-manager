@@ -1,35 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseServer } from '@/lib/supabase-server';
-import { buildPersonalUseCSV, fetchAllItems } from '@/lib/csv-export';
+import { buildPersonalUseCSV } from '@/lib/csv-export';
+import { csvExportRoute } from '@/lib/export-route';
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ batchId: string }> }
-) {
-  const { batchId } = await params;
-  const supabase = getSupabaseServer();
-
-  const { data: batch } = await supabase
-    .from('auction_batches')
-    .select('name')
-    .eq('id', batchId)
-    .single();
-
-  let items;
-  try { items = await fetchAllItems(supabase, batchId, 'personal_use'); }
-  catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return NextResponse.json({ error: msg }, { status: 500 });
-  }
-
-  const csv = buildPersonalUseCSV(items);
-  const filename = `${batch?.name ?? 'inventory'}-personal-use.csv`
-    .replace(/[^a-z0-9\-_.]/gi, '_');
-
-  return new NextResponse(csv, {
-    headers: {
-      'Content-Type': 'text/csv',
-      'Content-Disposition': `attachment; filename="${filename}"`,
-    },
-  });
-}
+export const GET = csvExportRoute({
+  build: buildPersonalUseCSV,
+  status: 'personal_use',
+  suffix: 'personal-use',
+});
