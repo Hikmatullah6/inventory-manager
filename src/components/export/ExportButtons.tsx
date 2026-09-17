@@ -24,6 +24,18 @@ export default function ExportButtons({ batchId, inventoryCount, soldCount, pers
 
   return (
     <div className="space-y-4">
+      {/* Quick export — every status, one sheet each */}
+      <a
+        href={`/api/export/${batchId}/quick`}
+        className="flex items-center justify-between bg-gray-700 hover:bg-gray-600 rounded-xl px-5 py-4 min-h-11 transition-colors"
+      >
+        <div>
+          <p className="font-semibold text-sm">Quick Export (Excel)</p>
+          <p className="text-xs text-gray-400 mt-0.5">SKU, title, links, status · one sheet per status</p>
+        </div>
+        <span className="text-gray-400 text-lg">↓</span>
+      </a>
+
       {/* Tab bar */}
       <div className="flex gap-1 bg-gray-800 rounded-xl p-1">
         {tabs.map(tab => (

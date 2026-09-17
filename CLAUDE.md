@@ -55,6 +55,7 @@ src/
 │   ├── thumbnail.ts      # Builds the proxied item-photo URL
 │   ├── csv-parser.ts     # Parse auction invoice CSVs
 │   ├── csv-export.ts     # Build export CSVs
+│   ├── xlsx-export.ts    # Quick Export workbook (one sheet per status)
 │   ├── pin.ts            # Server-only: PIN hashing + master PIN
 │   ├── session.ts        # Client-only: sessionStorage helpers
 │   └── supabase-*.ts     # Supabase clients
@@ -192,6 +193,26 @@ instead, and `PinGate` takes `hasPin`. Keep `pin_hash` in server-only `select`s.
 - **Master PIN:** read from the `MASTER_PIN` environment variable at runtime — never hardcoded. Set it in `.env.local` and in Vercel project settings. Never exposed to the client bundle. If the variable is missing, the master bypass is silently disabled but regular batch PINs still work.
 - **Session memory:** once a batch PIN is verified in a tab, it is cached in `sessionStorage` for the lifetime of that tab. The uploader is auto-verified after a successful upload so they don't need to re-enter their own PIN immediately
 - Batches with `pin_hash = NULL` (e.g. uploaded without a PIN) are freely accessible — no prompt shown; the client sees this as `has_pin: false`
+- **The cookie is what the server trusts.** `PinGate` and `ReviewClient` only hide
+  things in the browser, so the PIN is also proved server-side: a successful
+  `verify-pin` (and an upload) sets an httpOnly `ba_<batchId>` cookie — an HMAC
+  of the batch id keyed by the service role key — and a master PIN also sets
+  `ba_master`, which opens every batch. `src/lib/batch-access.ts` is the only
+  place that mints or checks one.
+  - Export routes call `requireBatchAccess` (plain-text 401, because a download
+    is a navigation and the person reads the response).
+  - `/api/items` and `/api/items/counts` call `denyUnlessBatchAccess`.
+  - `PATCH /api/items/[id]` takes `batch_id` in the body and checks the cookie
+    for it, scoping the update to that batch — one round trip, because this runs
+    on every tap. Without a matching cookie it falls back to looking the item's
+    batch up.
+  - `/review/[batchId]` and `/export/[batchId]` check the cookie themselves and
+    pass `null` counts and items when it is missing, so a locked batch's rows are
+    never in the HTML. The client fetches them once the PIN is entered; the
+    export page re-renders through `router.refresh()`.
+  - A tab that unlocked a batch before the cookie existed still holds the PIN in
+    `sessionStorage` and re-mints quietly. One that doesn't gets the prompt
+    rather than an empty screen.
 
 ## CSV Exports
 
@@ -203,6 +224,12 @@ The export page (`/export/[batchId]`) has four tabs:
 | Shopify | `/api/export/[batchId]/shopify` | have_it, partial |
 | Sold | `/api/export/[batchId]/sold` | sold |
 | Personal Use | `/api/export/[batchId]/personal-use` | personal_use |
+
+Above the tabs, **Quick Export** (`/api/export/[batchId]/quick`, built by
+`src/lib/xlsx-export.ts` with `exceljs`) downloads one `.xlsx` for the whole
+batch: SKU, Title, Product Link, Thumbnail, Status, one sheet per status in the
+order Have It, Partial, Broken, Sold, Personal Use, Don't Have, Pending. Empty
+statuses get no sheet; only `http(s)` URLs become clickable links.
 
 All export routes use paginated Supabase queries (1000 rows/page) so they are not subject to the server-side `max_rows` cap. The Shopify CSV leaves the Price column blank — fill before importing to Shopify.
 
@@ -216,3 +243,13 @@ palette stays; keep new work inside the existing Tailwind classes.
 ## Deployment
 
 Deployed to Vercel. The first three environment variables below **must** be set in Vercel project settings before the first deploy — missing vars cause a 500 on upload. `MASTER_PIN` should also be set or the master bypass will be disabled. After adding env vars, trigger a redeploy from the Vercel dashboard.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
