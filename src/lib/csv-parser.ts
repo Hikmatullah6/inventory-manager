@@ -1,36 +1,64 @@
-// src/lib/csv-parser.ts
 import Papa from 'papaparse';
 import { ParsedCSVRow, CSVParseResult } from './types';
+import { splitMulti } from './multi-value';
 
+/**
+ * Header text (normalized: BOM/CR stripped, trimmed, lowercased) -> item field.
+ *
+ * The import sheet has 18 columns; the aliases below them are tolerated
+ * spellings so a sheet renamed by hand still imports.
+ *
+ * `price` maps to `price`, NOT to `cost`. The sheet carries both — what we paid
+ * and what we ask — and an earlier version of this map conflated them.
+ */
 const COLUMN_MAP: Record<string, keyof ParsedCSVRow> = {
+  // The 18 columns of the import sheet, in sheet order.
   'sku': 'sku',
+  'title': 'title',
+  'description': 'description',
+  'condition': 'condition',
+  'cost': 'cost',
+  'estimated retail': 'estimated_retail',
+  'price': 'price',
+  'link': 'link',
+  'thumbnail link': 'thumbnail_url',
+  'date bought': 'date_bought',
+  'company': 'company_name',
+  'location bought': 'location_bought',
+  'auction date': 'auction_date',
+  'category': 'category',
+  'subcategory': 'subcategory',
+  'tags': 'tags',
+  'season': 'season',
+  'quantity': 'quantity',
+
+  // Tolerated spellings of the same columns.
   'sku numbers': 'sku',
   'sku #': 'sku',
   'item #': 'sku',
-  'link': 'link',
-  'title': 'title',
   'item title': 'title',
   'item name': 'title',
   'name': 'title',
-  'thumbnail link': 'thumbnail_url',
+  'estimated_retail': 'estimated_retail',
+  'est retail': 'estimated_retail',
+  'retail': 'estimated_retail',
   'thumbnail_link': 'thumbnail_url',
   'thumbnail_url': 'thumbnail_url',
   'thumbnail': 'thumbnail_url',
-  'image count': 'image_count',
-  'image_count': 'image_count',
-  'description': 'description',
-  'date bought': 'date_bought',
   'date_bought': 'date_bought',
-  'cost': 'cost',
-  'price': 'cost',
   'company name': 'company_name',
   'company_name': 'company_name',
-  'company': 'company_name',
   'vendor': 'company_name',
-  'location bought': 'location_bought',
   'location_bought': 'location_bought',
-  'auction date': 'auction_date',
   'auction_date': 'auction_date',
+  'sub category': 'subcategory',
+  'sub-category': 'subcategory',
+  'subcategories': 'subcategory',
+  'qty': 'quantity',
+  'image count': 'image_count',
+  'image_count': 'image_count',
+
+  // Shelf position, which the sheet does not carry but review writes.
   'location': 'shelf_location',
   'shelf_location': 'shelf_location',
   'shelf': 'shelf_location',
@@ -38,9 +66,27 @@ const COLUMN_MAP: Record<string, keyof ParsedCSVRow> = {
 
 const REQUIRED_MAPPED: (keyof ParsedCSVRow)[] = ['sku', 'title'];
 
+/** Comma-separated cells (subcategory, tags) -> a deduped array. */
+const LIST_FIELDS = new Set<keyof ParsedCSVRow>(['subcategory', 'tags']);
+/** Currency cells: a leading $ and thousands separators are stripped. */
+const MONEY_FIELDS = new Set<keyof ParsedCSVRow>(['cost', 'estimated_retail', 'price']);
+const INT_FIELDS = new Set<keyof ParsedCSVRow>(['quantity', 'image_count']);
+
 // Normalize a single header cell: strip BOM, carriage returns, trim, lowercase
 function normalizeHeader(h: string): string {
   return h.replace(/^\uFEFF/, '').replace(/\r/g, '').trim().toLowerCase();
+}
+
+/**
+ * `parseFloat(x) || null` would turn a legitimate 0 into null — wrong for a
+ * free lot, and wrong for a quantity of 0.
+ */
+function parseNumber(value: string | null, integer: boolean): number | null {
+  if (!value) return null;
+  const cleaned = value.replace(/[$,]/g, '').trim();
+  if (!cleaned) return null;
+  const n = integer ? parseInt(cleaned, 10) : parseFloat(cleaned);
+  return Number.isFinite(n) ? n : null;
 }
 
 // Parse a single date string into YYYY-MM-DD format.
@@ -62,19 +108,39 @@ function parseDate(value: string | null): string | null {
   return null;
 }
 
-// Parse a date field that may be a range (e.g. "1/22/2026 - 1/27/2026").
-// Returns start and end dates in YYYY-MM-DD format.
+/**
+ * Parse a date field that may be a range: "1/22/2026 - 1/27/2026",
+ * "2026-01-22 - 2026-01-27", "1/22/2026-1/27/2026", or a single date.
+ *
+ * The separator must be a *spaced* dash. Splitting on any hyphen — which this
+ * used to do — breaks on ISO dates, because they contain hyphens themselves:
+ * `2026-01-22` split that way yields three parts and parses to null. That made
+ * the exported range (and a lone ISO date) unreadable on re-import.
+ */
 function parseDateRange(value: string | null): { start: string | null; end: string | null } {
   if (!value) return { start: null, end: null };
-  const parts = value.split(/\s*[-–—]\s*/);
-  const start = parseDate(parts[0] ?? null);
-  // Only treat as a range when there are exactly two parts and the second looks like a date
-  const end = parts.length === 2 ? parseDate(parts[1] ?? null) : null;
-  return { start, end };
+  const trimmed = value.trim();
+
+  const spaced = trimmed.split(/\s+[-–—]\s+/);
+  if (spaced.length === 2) {
+    return { start: parseDate(spaced[0]), end: parseDate(spaced[1]) };
+  }
+
+  // An unspaced range is only unambiguous in slash form, where the separator
+  // cannot be mistaken for part of a date.
+  const slashRange = trimmed.match(
+    /^(\d{1,2}\/\d{1,2}\/\d{2,4})\s*[-–—]\s*(\d{1,2}\/\d{1,2}\/\d{2,4})$/
+  );
+  if (slashRange) {
+    return { start: parseDate(slashRange[1]), end: parseDate(slashRange[2]) };
+  }
+
+  return { start: parseDate(trimmed), end: null };
 }
 
 // Find the first row that contains at least one recognized column (sku or title).
-// Google Sheets exports often have a title row before the actual headers.
+// The sheet puts headers on row 1, but Google Sheets exports often prepend a
+// title row, and this still rescues those.
 function findHeaderRowIndex(lines: string[]): number {
   for (let i = 0; i < Math.min(lines.length, 10); i++) {
     const cells = lines[i].split(/,|\t/).map(normalizeHeader);
@@ -90,22 +156,20 @@ export function parseAuctionCSV(csvText: string): CSVParseResult {
     return { rows: [], errors: [{ row: 0, message: 'CSV is empty' }], duplicateSKUs: [] };
   }
 
-  // Strip BOM from start of file
-  const cleaned = csvText.replace(/^\uFEFF/, '');
+  // Strip BOM
+  const clean = csvText.replace(/^\uFEFF/, '');
 
-  // Find which line has the real column headers
-  const lines = cleaned.split(/\r?\n/);
+  const lines = clean.split(/\r?\n/);
   const headerRowIndex = findHeaderRowIndex(lines);
-  // Rebuild CSV starting from the header row
-  const csvFromHeader = lines.slice(headerRowIndex).join('\n');
+  const usable = lines.slice(headerRowIndex).join('\n');
 
-  const parsed = Papa.parse<Record<string, string>>(csvFromHeader, {
+  const parsed = Papa.parse<Record<string, string>>(usable, {
     header: true,
     skipEmptyLines: true,
     transformHeader: normalizeHeader,
   });
 
-  if (!parsed.data.length) {
+  if (!parsed.data || parsed.data.length === 0) {
     return { rows: [], errors: [{ row: 0, message: 'CSV has no data rows' }], duplicateSKUs: [] };
   }
 
@@ -133,10 +197,14 @@ export function parseAuctionCSV(csvText: string): CSVParseResult {
       const field = COLUMN_MAP[header]; // already normalized by transformHeader
       if (!field) continue;
       const trimmed = value?.trim() || null;
-      if (field === 'image_count') {
-        mapped.image_count = trimmed ? parseInt(trimmed, 10) || null : null;
-      } else if (field === 'cost') {
-        mapped.cost = trimmed ? parseFloat(trimmed.replace(/[$,]/g, '')) || null : null;
+
+      if (LIST_FIELDS.has(field)) {
+        // [] not null: the columns are NOT NULL DEFAULT '{}'.
+        (mapped as Record<string, unknown>)[field] = splitMulti(trimmed);
+      } else if (MONEY_FIELDS.has(field)) {
+        (mapped as Record<string, unknown>)[field] = parseNumber(trimmed, false);
+      } else if (INT_FIELDS.has(field)) {
+        (mapped as Record<string, unknown>)[field] = parseNumber(trimmed, true);
       } else if (field === 'date_bought') {
         mapped.date_bought = parseDate(trimmed);
       } else if (field === 'auction_date') {

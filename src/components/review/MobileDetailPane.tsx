@@ -2,10 +2,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { countFilledDetails, useItemForm } from '@/hooks/useItemForm';
 import { useDetailsOpen } from '@/hooks/useDetailsOpen';
+import { useCostVisible } from '@/hooks/useCostVisible';
 import CollapsibleSection from './CollapsibleSection';
+import ChipInput from './ChipInput';
 import { thumbnailSrc } from '@/lib/thumbnail';
 import { STATUS_DOT, STATUS_OPTIONS, STATUS_SHORT } from '@/lib/item-status';
-import type { Item, ItemStatus, ItemUpdate } from '@/lib/types';
+import type { Item, ItemFacets, ItemStatus, ItemUpdate } from '@/lib/types';
 
 /** 56px row + 1px divider — the stride used to scroll the rail. */
 const RAIL_ROW = 57;
@@ -20,6 +22,8 @@ interface Props {
   onSelect: (id: string) => void;
   onClose: () => void;
   onUpdate: (id: string, update: ItemUpdate) => void;
+  /** Existing values in this batch, offered while editing. */
+  facets?: ItemFacets;
 }
 
 /**
@@ -29,11 +33,13 @@ interface Props {
  *
  * Keyed on item.id by the caller, so the form and the Saved bar reset per item.
  */
-export default function MobileDetailPane({ items, item, onSelect, onClose, onUpdate }: Props) {
+export default function MobileDetailPane({ items, item, onSelect, onClose, onUpdate, facets }: Props) {
   const form = useItemForm(item, onUpdate);
   // Everything below the status buttons is one disclosure, so marking an item
   // takes no scrolling. The open flag is shared and sticky across items.
   const [detailsOpen, setDetailsOpen] = useDetailsOpen();
+  // Hidden by default: the phone gets handed around in front of customers.
+  const [costVisible] = useCostVisible();
   const railRef = useRef<HTMLDivElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -80,12 +86,6 @@ export default function MobileDetailPane({ items, item, onSelect, onClose, onUpd
   function step(delta: number) {
     const next = items[index + delta];
     if (next) onSelect(next.id);
-  }
-
-  function commitNumber(field: 'qty_good' | 'qty_broken' | 'qty_sold', raw: string) {
-    const parsed = raw === '' ? null : parseInt(raw, 10);
-    const value = parsed != null && Number.isFinite(parsed) ? parsed : null;
-    form.handleBlur(field, field === 'qty_sold' ? (value ?? 0) : value);
   }
 
   const photoSrc = thumbnailSrc(item.thumbnail_url);
@@ -182,14 +182,25 @@ export default function MobileDetailPane({ items, item, onSelect, onClose, onUpd
           )}
 
           <div className="flex flex-col gap-[7px]">
-            <h2 className="m-0 text-lg font-semibold leading-[1.3] [text-wrap:pretty]">{item.title}</h2>
+            {/* Editable in place: auction titles are often sloppy. */}
+            <textarea
+              rows={2}
+              value={form.title}
+              onChange={e => form.setTitle(e.target.value)}
+              onBlur={() => { if (form.title.trim()) form.commitText('title', form.title); }}
+              aria-label="Title"
+              className="w-full m-0 bg-transparent border border-transparent focus:border-blue-400
+                focus:bg-gray-800 rounded-[10px] px-2 -mx-2 py-1 text-lg font-semibold leading-[1.3]
+                text-white resize-none focus:outline-none"
+            />
             <div className="flex flex-wrap gap-[6px]">
               <span className="text-[13px] px-[10px] py-1 rounded-full bg-gray-700 text-gray-200 font-mono">
                 {item.sku}
               </span>
+              {/* The pill stays either way so the row does not reflow on toggle. */}
               {item.cost != null && (
                 <span className="text-[13px] px-[10px] py-1 rounded-full bg-gray-700 text-gray-200">
-                  Cost ${item.cost}
+                  Cost {costVisible ? `$${item.cost}` : '•••'}
                 </span>
               )}
               {item.company_name && (
@@ -232,6 +243,39 @@ export default function MobileDetailPane({ items, item, onSelect, onClose, onUpd
             })}
           </div>
 
+          {/* The count corrected on the floor, and the number quoted to a
+              customer. Both stay out of the disclosure. */}
+          <div className="grid grid-cols-2 gap-[7px]">
+            <div className="min-w-0 flex flex-col gap-[5px]">
+              <label className="text-[13px] text-gray-400">Quantity</label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                inputMode="numeric"
+                value={form.quantity}
+                onChange={e => form.setQuantity(e.target.value)}
+                onBlur={() => form.commitNumber('quantity', form.quantity, true)}
+                placeholder="—"
+                className={`${fieldClass} px-2 text-center`}
+              />
+            </div>
+            <div className="min-w-0 flex flex-col gap-[5px]">
+              <label className="text-[13px] text-gray-400">Price</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                inputMode="decimal"
+                value={form.price}
+                onChange={e => form.setPrice(e.target.value)}
+                onBlur={() => form.commitNumber('price', form.price)}
+                placeholder="0.00"
+                className={`${fieldClass} px-2 text-center`}
+              />
+            </div>
+          </div>
+
           {form.status === 'sold' && (
             <div className="flex flex-col gap-[5px]">
               <label className="text-[13px] text-gray-400">Sale Price</label>
@@ -242,10 +286,7 @@ export default function MobileDetailPane({ items, item, onSelect, onClose, onUpd
                 inputMode="decimal"
                 value={form.salePrice}
                 onChange={e => form.setSalePrice(e.target.value)}
-                onBlur={() => {
-                  const num = form.salePrice === '' ? null : Math.max(0, parseFloat(form.salePrice));
-                  form.handleBlur('sale_price', num != null && Number.isFinite(num) ? num : null);
-                }}
+                onBlur={() => form.commitNumber('sale_price', form.salePrice)}
                 placeholder="0.00"
                 className={fieldClass}
               />
@@ -254,35 +295,89 @@ export default function MobileDetailPane({ items, item, onSelect, onClose, onUpd
 
           <CollapsibleSection
             title="Details"
-            filledCount={countFilledDetails(form, item)}
+            filledCount={countFilledDetails(form)}
             open={detailsOpen}
             onToggle={setDetailsOpen}
           >
-            {item.description && (
-              <p className="m-0 text-sm leading-[1.5] text-gray-400 [text-wrap:pretty]">
-                {item.description}
-              </p>
-            )}
+            <div className="flex flex-col gap-[5px]">
+              <label className="text-[13px] text-gray-400">Condition</label>
+              <input
+                type="text"
+                value={form.condition}
+                onChange={e => form.setCondition(e.target.value)}
+                onBlur={() => form.commitText('condition', form.condition)}
+                placeholder="e.g. New, Open box"
+                className={fieldClass}
+              />
+            </div>
 
-            <div className="grid grid-cols-3 gap-[7px]">
-              {([
-                { label: 'Good',   value: form.qtyGood,   set: form.setQtyGood,   field: 'qty_good' as const },
-                { label: 'Broken', value: form.qtyBroken, set: form.setQtyBroken, field: 'qty_broken' as const },
-                { label: 'Sold',   value: form.qtySold,   set: form.setQtySold,   field: 'qty_sold' as const },
-              ]).map(({ label, value, set, field }) => (
-                <div key={field} className="min-w-0 flex flex-col gap-[5px]">
-                  <label className="text-xs text-gray-400">{label}</label>
-                  <input
-                    type="number"
-                    min="0"
-                    inputMode="numeric"
-                    value={value}
-                    onChange={e => set(e.target.value)}
-                    onBlur={() => commitNumber(field, value)}
-                    className={`${fieldClass} px-2 text-center`}
-                  />
-                </div>
-              ))}
+            <div className="grid grid-cols-2 gap-[7px]">
+              <div className="min-w-0 flex flex-col gap-[5px]">
+                <label className="text-[13px] text-gray-400">Est. Retail</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  inputMode="decimal"
+                  value={form.estimatedRetail}
+                  onChange={e => form.setEstimatedRetail(e.target.value)}
+                  onBlur={() => form.commitNumber('estimated_retail', form.estimatedRetail)}
+                  placeholder="0.00"
+                  className={`${fieldClass} px-2 text-center`}
+                />
+              </div>
+              <div className="min-w-0 flex flex-col gap-[5px]">
+                <label className="text-[13px] text-gray-400">Season</label>
+                <input
+                  type="text"
+                  value={form.season}
+                  onChange={e => form.setSeason(e.target.value)}
+                  onBlur={() => form.commitText('season', form.season)}
+                  placeholder="e.g. Winter"
+                  className={`${fieldClass} px-2`}
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-[5px]">
+              <label className="text-[13px] text-gray-400">Category</label>
+              <input
+                type="text"
+                value={form.category}
+                onChange={e => form.setCategory(e.target.value)}
+                onBlur={() => form.commitText('category', form.category)}
+                placeholder="e.g. Tools"
+                className={fieldClass}
+              />
+            </div>
+
+            <ChipInput
+              label="Subcategory"
+              values={form.subcategory}
+              suggestions={facets?.subcategories}
+              placeholder="Add a subcategory"
+              onChange={next => form.commitList('subcategory', next)}
+            />
+
+            <ChipInput
+              label="Tags"
+              values={form.tags}
+              suggestions={facets?.tags}
+              placeholder="Add a tag"
+              onChange={next => form.commitList('tags', next)}
+            />
+
+            <div className="flex flex-col gap-[5px]">
+              <label className="text-[13px] text-gray-400">Description</label>
+              <textarea
+                rows={3}
+                value={form.description}
+                onChange={e => form.setDescription(e.target.value)}
+                onBlur={() => form.commitText('description', form.description)}
+                placeholder="Description..."
+                className="w-full bg-gray-800 border border-gray-600 rounded-[10px] px-3 py-[10px]
+                  text-base text-white resize-none focus:outline-none focus:border-blue-400"
+              />
             </div>
 
             <div className="flex flex-col gap-[5px]">
@@ -291,7 +386,7 @@ export default function MobileDetailPane({ items, item, onSelect, onClose, onUpd
                 type="text"
                 value={form.location}
                 onChange={e => form.setLocation(e.target.value)}
-                onBlur={() => form.handleBlur('shelf_location', form.location || null)}
+                onBlur={() => form.commitText('shelf_location', form.location)}
                 placeholder="e.g. Shelf B2, Back Room"
                 className={fieldClass}
               />
@@ -303,7 +398,7 @@ export default function MobileDetailPane({ items, item, onSelect, onClose, onUpd
                 rows={3}
                 value={form.notes}
                 onChange={e => form.setNotes(e.target.value)}
-                onBlur={() => form.handleBlur('notes', form.notes || null)}
+                onBlur={() => form.commitText('notes', form.notes)}
                 placeholder="Any notes..."
                 className="w-full bg-gray-800 border border-gray-600 rounded-[10px] px-3 py-[10px]
                   text-base text-white resize-none focus:outline-none focus:border-blue-400"

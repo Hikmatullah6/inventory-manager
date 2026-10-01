@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServer } from '@/lib/supabase-server';
-import { fetchAllItems } from '@/lib/csv-export';
 import { requireBatchAccess } from '@/lib/batch-access';
-import { exportFilename } from '@/lib/export-route';
-import { buildQuickExportWorkbook } from '@/lib/xlsx-export';
+import { fetchAllItemsForExport } from '@/lib/item-query';
+import { buildExportWorkbook, exportFilename } from '@/lib/xlsx-export';
 
+/** The whole batch: 18 import columns, one sheet per status. */
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ batchId: string }> }
@@ -16,18 +16,18 @@ export async function GET(
   if ('denied' in access) return access.denied;
 
   let items;
-  try { items = await fetchAllItems(supabase, batchId); }
+  try { items = await fetchAllItemsForExport(supabase, batchId); }
   catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 
-  const xlsx = await buildQuickExportWorkbook(items);
+  const xlsx = await buildExportWorkbook(items);
 
   return new NextResponse(new Uint8Array(xlsx), {
     headers: {
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'Content-Disposition': `attachment; filename="${exportFilename(access.batch.name, 'quick-export', 'xlsx')}"`,
+      'Content-Disposition': `attachment; filename="${exportFilename(access.batch.name, 'export', 'xlsx')}"`,
     },
   });
 }

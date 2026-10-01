@@ -1,6 +1,7 @@
 // src/lib/item-counts.ts
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ItemStatus } from './types';
+import { applyItemFilters, DEFAULT_FILTERS, type ItemFilters } from './item-query';
 
 export const COUNTED_STATUSES: ItemStatus[] = [
   'pending', 'have_it', 'dont_have', 'broken', 'partial', 'sold', 'personal_use',
@@ -19,25 +20,24 @@ export const EMPTY_COUNTS: StatusCounts = {
  * of a possible several thousand, so a client-side tally would be wrong by two
  * orders of magnitude.
  *
- * The search term is applied too, so a chip's count always equals the number of
- * results tapping it would produce.
+ * Every filter except the status itself is applied, so a chip's count always
+ * equals the number of results tapping it would produce.
  */
 export async function getStatusCounts(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: SupabaseClient<any, any, any>,
   batchId: string,
-  search = ''
+  filters: ItemFilters = DEFAULT_FILTERS,
 ): Promise<StatusCounts> {
   const counted = await Promise.all(
-    COUNTED_STATUSES.map(status => {
-      let query = supabase
-        .from('items')
-        .select('*', { count: 'exact', head: true })
-        .eq('batch_id', batchId)
-        .eq('status', status);
-      if (search) query = query.or(`title.ilike.%${search}%,sku.ilike.%${search}%`);
-      return query;
-    })
+    COUNTED_STATUSES.map(status =>
+      applyItemFilters(
+        supabase.from('items').select('*', { count: 'exact', head: true }),
+        batchId,
+        filters,
+        { includeStatus: false },
+      ).eq('status', status)
+    )
   );
 
   const counts = { ...EMPTY_COUNTS };

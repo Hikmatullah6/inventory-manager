@@ -1,10 +1,16 @@
 'use client';
 import { useState, useCallback, useEffect, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
-import { AuctionBatch, Item, ItemStatus, ItemUpdate, ItemsQueryResult } from '@/lib/types';
+import { AuctionBatch, Item, ItemFacets, ItemStatus, ItemUpdate, ItemsQueryResult } from '@/lib/types';
 import { EMPTY_COUNTS, type StatusCounts } from '@/lib/item-counts';
+import { EMPTY_FACETS } from '@/lib/item-facets';
+import {
+  DEFAULT_FILTERS, DEFAULT_SORT, filtersToParams,
+  type FacetSelection, type ItemFilters, type SortKey,
+} from '@/lib/item-query';
 import { useItems } from '@/hooks/useItems';
 import { useItemUpdate } from '@/hooks/useItemUpdate';
+import { useCostVisible } from '@/hooks/useCostVisible';
 import ReviewHeader from '@/components/review/ReviewHeader';
 import SearchFilter from '@/components/review/SearchFilter';
 import CardView from '@/components/review/CardView';
@@ -26,20 +32,26 @@ interface Props {
   initialItems: ItemsQueryResult | null;
   /** Totals behind each filter chip, counted on the server. Null when locked. */
   initialCounts: StatusCounts | null;
+  /** Distinct values for the facet pickers. Null when locked. */
+  initialFacets: ItemFacets | null;
 }
 
-export default function ReviewClient({ batch, initialItems, initialCounts }: Props) {
+export default function ReviewClient({ batch, initialItems, initialCounts, initialFacets }: Props) {
   const batchId = batch.id;
   const router = useRouter();
   const [view, setView] = useState<'card' | 'table'>('table');
-  const [search, setSearch] = useState('');
-  const [status, setStatus] = useState<ItemStatus | 'all'>('pending');
-  const [sort, setSort] = useState('date_bought_asc');
-  const [page, setPage] = useState(1);
+  // One object rather than five pieces of state: it is what useItems keys on and
+  // what the counts fetch sends, and DEFAULT_FILTERS is the same value the
+  // server rendered the first page from, so the two cannot disagree.
+  const [filters, setFilters] = useState<ItemFilters>(DEFAULT_FILTERS);
   const [cardIndex, setCardIndex] = useState(0);
   const [localItems, setLocalItems] = useState<Item[]>(initialItems?.items ?? []);
   const [counts, setCounts] = useState<StatusCounts>(initialCounts ?? EMPTY_COUNTS);
+  const [facets, setFacets] = useState<ItemFacets>(initialFacets ?? EMPTY_FACETS);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Shared with both detail layouts through a module-level value, so the eye in
+  // the header and the figures in the panes always agree.
+  const [costVisible, setCostVisible] = useCostVisible();
   const [unlocked, setUnlocked] = useState(false);
   const [reminted, setReminted] = useState(false);
 
@@ -77,7 +89,7 @@ export default function ReviewClient({ batch, initialItems, initialCounts }: Pro
   const canLoad = pinVerified && (!needsRemint || reminted);
 
   const { data, loading } = useItems({
-    batchId, search, status, sort, page, initialData: initialItems, enabled: canLoad,
+    batchId, filters, initialData: initialItems, enabled: canLoad,
   });
 
   // Sync items from server into local state so we can apply optimistic updates
@@ -88,20 +100,38 @@ export default function ReviewClient({ batch, initialItems, initialCounts }: Pro
     }
   }, [data, loading]);
 
-  // Chip counts cover the whole batch, so they have to be recounted whenever the
-  // search term changes — the loaded page is 50 rows and cannot be tallied for
-  // an answer about thousands. `search` is already debounced by SearchFilter.
+  // Chip counts cover the whole batch, so they have to be recounted whenever
+  // anything except the status narrows the list — the loaded page is 50 rows and
+  // cannot be tallied for an answer about thousands. The facet filters go along
+  // too: a chip's count has to equal what tapping it would produce.
+  //
+  // Keyed on the search and the facets only: status is what the chips enumerate,
+  // and neither sort nor page can change a total. Pinning those three keeps a
+  // sort change or a page turn from costing seven count queries.
+  const countsKey = filtersToParams(batchId, {
+    ...filters, status: 'all', sort: DEFAULT_SORT, page: 1,
+  }).toString();
   useEffect(() => {
     if (!canLoad) return;
     let cancelled = false;
-    const params = new URLSearchParams({ batchId });
-    if (search) params.set('search', search);
-    fetch(`/api/items/counts?${params}`)
+    fetch(`/api/items/counts?${countsKey}`)
       .then(r => (r.ok ? r.json() : null))
       .then((next: StatusCounts | null) => { if (!cancelled && next) setCounts(next); })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [batchId, search, canLoad]);
+  }, [countsKey, canLoad]);
+
+  // The pickers' vocabulary is per batch, not per filter, so this runs once —
+  // only for the unlock-after-mount path, since the server already seeded it.
+  useEffect(() => {
+    if (!canLoad || initialFacets) return;
+    let cancelled = false;
+    fetch(`/api/items/facets?batchId=${batchId}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then((next: ItemFacets | null) => { if (!cancelled && next) setFacets(next); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [batchId, canLoad, initialFacets]);
 
   const { updateItem } = useItemUpdate(
     batchId,
@@ -125,19 +155,27 @@ export default function ReviewClient({ batch, initialItems, initialCounts }: Pro
     updateItem(id, update);
   }, [localItems, updateItem]);
 
-  const handleSearch = useCallback((q: string) => {
-    setSearch(q);
-    setPage(1);
+  // Every filter change resets to page 1: page 3 of the old result set says
+  // nothing about the new one. Empty deps keep these referentially stable, which
+  // is what stops SearchFilter's debounce effect restarting on every render.
+  const handleSearch = useCallback((search: string) => {
+    setFilters(f => (f.search === search ? f : { ...f, search, page: 1 }));
   }, []);
 
-  const handleStatus = useCallback((s: ItemStatus | 'all') => {
-    setStatus(s);
-    setPage(1);
+  const handleStatus = useCallback((status: ItemStatus | 'all') => {
+    setFilters(f => ({ ...f, status, page: 1 }));
   }, []);
 
-  const handleSort = useCallback((s: string) => {
-    setSort(s);
-    setPage(1);
+  const handleSort = useCallback((sort: SortKey) => {
+    setFilters(f => ({ ...f, sort, page: 1 }));
+  }, []);
+
+  const handleFacets = useCallback((selection: FacetSelection) => {
+    setFilters(f => ({ ...f, ...selection, page: 1 }));
+  }, []);
+
+  const setPage = useCallback((next: (p: number) => number) => {
+    setFilters(f => ({ ...f, page: next(f.page) }));
   }, []);
 
   if (!hydrated) return null;
@@ -181,16 +219,21 @@ export default function ReviewClient({ batch, initialItems, initialCounts }: Pro
         total={batch.item_count}
         view={view}
         onViewChange={setView}
+        costVisible={costVisible}
+        onCostVisible={setCostVisible}
       />
       <div className="w-full max-w-4xl mx-auto px-4 py-4 space-y-4 flex-1 min-h-0 flex flex-col sm:block">
         <div className={phoneDetailOpen ? 'hidden sm:block' : ''}>
           <SearchFilter
             onSearch={handleSearch}
             onStatus={handleStatus}
-            status={status}
-            sort={sort}
+            status={filters.status}
+            sort={filters.sort}
             onSort={handleSort}
             counts={counts}
+            facets={facets}
+            facetSelection={filters}
+            onFacetSelection={handleFacets}
           />
         </div>
 
@@ -207,6 +250,7 @@ export default function ReviewClient({ batch, initialItems, initialCounts }: Pro
             total={localItems.length}
             onNavigate={setCardIndex}
             onUpdate={handleUpdate}
+            facets={facets}
           />
         )}
 
@@ -216,6 +260,7 @@ export default function ReviewClient({ batch, initialItems, initialCounts }: Pro
             onUpdate={handleUpdate}
             selectedId={selectedId}
             onSelect={setSelectedId}
+            facets={facets}
           />
         )}
 
@@ -223,17 +268,17 @@ export default function ReviewClient({ batch, initialItems, initialCounts }: Pro
           <div className={`items-center justify-center gap-4 pb-4 ${phoneDetailOpen ? 'hidden sm:flex' : 'flex'}`}>
             <button
               onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page === 1}
+              disabled={filters.page === 1}
               className="px-4 min-h-11 text-sm rounded bg-gray-700 text-white disabled:opacity-40 hover:bg-gray-600 disabled:cursor-not-allowed"
             >
               ← Prev
             </button>
             <span className="text-sm text-gray-400">
-              Page {page} of {Math.ceil(data.total / data.pageSize)}
+              Page {filters.page} of {Math.ceil(data.total / data.pageSize)}
             </span>
             <button
               onClick={() => setPage(p => Math.min(Math.ceil(data.total / data.pageSize), p + 1))}
-              disabled={page === Math.ceil(data.total / data.pageSize)}
+              disabled={filters.page === Math.ceil(data.total / data.pageSize)}
               className="px-4 min-h-11 text-sm rounded bg-gray-700 text-white disabled:opacity-40 hover:bg-gray-600 disabled:cursor-not-allowed"
             >
               Next →

@@ -41,8 +41,6 @@ export default async function ExportPage({ params }: { params: Promise<{ batchId
   ) as Record<ItemStatus, number>;
   const total = VALID_STATUSES.reduce((sum, status) => sum + counts[status], 0);
 
-  const exportCount = counts.have_it + counts.broken + counts.partial;
-
   return (
     <PinGate
       batchId={batchId}
@@ -55,14 +53,14 @@ export default async function ExportPage({ params }: { params: Promise<{ batchId
           <div>
             <Link href="/" className="text-gray-400 hover:text-white text-sm min-h-11 inline-flex items-center">← Back</Link>
             <h1 className="text-xl font-bold mt-3">{batch?.name ?? 'Export'}</h1>
-            <p className="text-gray-400 text-sm mt-1">Download your inventory as CSV</p>
+            <p className="text-gray-400 text-sm mt-1">Download this batch as one Excel workbook</p>
           </div>
           <ExportStats stats={{ total, ...counts }} />
           <ExportButtons
             batchId={batchId}
-            inventoryCount={exportCount}
-            soldCount={counts.sold}
-            personalUseCount={counts.personal_use}
+            batchName={batch.name}
+            hasPin={batch.pin_hash !== null}
+            counts={counts}
           />
         </div>
       </div>

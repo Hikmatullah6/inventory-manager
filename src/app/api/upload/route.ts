@@ -50,11 +50,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // qty_sold is no longer sent: the field is retired in favour of `quantity`.
+    // Its column survives as NOT NULL DEFAULT 0, which is what makes the omission
+    // safe — drop that default and every upload fails.
     const itemsToInsert = rows.map(row => ({
       ...row,
       batch_id: batch.id,
       status: 'pending',
-      qty_sold: 0,
     }));
 
     const { error: itemsError } = await supabase

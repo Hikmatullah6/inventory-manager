@@ -4,34 +4,40 @@ import { cookies } from 'next/headers';
 import { getSupabaseServer } from '@/lib/supabase-server';
 import { hasBatchAccess } from '@/lib/batch-access';
 import { getStatusCounts } from '@/lib/item-counts';
+import { getItemFacets } from '@/lib/item-facets';
+import {
+  applyItemFilters, applySort, DEFAULT_FILTERS, pageRange, PAGE_SIZE,
+} from '@/lib/item-query';
 import ReviewClient from '@/components/review/ReviewClient';
 import type { Item } from '@/lib/types';
-
-/** Must match the client's opening filter and sort, and /api/items' page size. */
-const INITIAL_STATUS = 'pending';
-const INITIAL_SORT = { column: 'date_bought', ascending: true };
-const PAGE_SIZE = 50;
 
 export default async function ReviewPage({ params }: { params: Promise<{ batchId: string }> }) {
   const { batchId } = await params;
   const supabase = getSupabaseServer();
+  const [from, to] = pageRange(DEFAULT_FILTERS.page);
 
-  // Batch, progress and the first page of items all at once. This used to be a
-  // fetch of every batch in the account (two count queries each) followed by a
-  // second fetch for the items, with a blank screen until both landed.
-  const [batchResult, totalResult, reviewedResult, itemsResult, counts] = await Promise.all([
+  // Batch, progress, the first page of items and the filter vocabulary all at
+  // once. This used to be a fetch of every batch in the account (two count
+  // queries each) followed by a second fetch for the items, with a blank screen
+  // until both landed.
+  //
+  // The first page is built from DEFAULT_FILTERS through the same helpers
+  // /api/items uses, so it cannot drift from what ReviewClient opens on — and
+  // useItems' seeded cache key cannot end up describing different rows.
+  const [batchResult, totalResult, reviewedResult, itemsResult, counts, facets] = await Promise.all([
     supabase.from('auction_batches').select('id, name, imported_at, pin_hash').eq('id', batchId).single(),
     supabase.from('items').select('*', { count: 'exact', head: true }).eq('batch_id', batchId),
     supabase.from('items').select('*', { count: 'exact', head: true }).eq('batch_id', batchId).neq('status', 'pending'),
-    supabase
-      .from('items')
-      .select('*', { count: 'exact' })
-      .eq('batch_id', batchId)
-      .eq('status', INITIAL_STATUS)
-      .range(0, PAGE_SIZE - 1)
-      .order(INITIAL_SORT.column, { ascending: INITIAL_SORT.ascending })
-      .order('id', { ascending: true }),
+    applySort(
+      applyItemFilters(
+        supabase.from('items').select('*', { count: 'exact' }),
+        batchId,
+        DEFAULT_FILTERS,
+      ).range(from, to),
+      DEFAULT_FILTERS.sort,
+    ),
     getStatusCounts(supabase, batchId),
+    getItemFacets(supabase, batchId),
   ]);
 
   if (batchResult.error || !batchResult.data) notFound();
@@ -60,6 +66,7 @@ export default async function ReviewPage({ params }: { params: Promise<{ batchId
         pageSize: PAGE_SIZE,
       } : null}
       initialCounts={unlockedHere ? counts : null}
+      initialFacets={unlockedHere ? facets : null}
     />
   );
 }

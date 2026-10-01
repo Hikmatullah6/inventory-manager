@@ -2,10 +2,13 @@
 import { STATUS_BADGE, STATUS_DOT, STATUS_SHORT } from '@/lib/item-status';
 import type { Item } from '@/lib/types';
 
-/** "good 2 · sold 1", or a plain note when nothing has been counted yet. */
-function qtyLabel(item: Item) {
-  if (item.qty_good == null) return 'not counted';
-  return `good ${item.qty_good} · sold ${item.qty_sold}`;
+/** "qty 3 · $39.99" — the count and the asking price, the two numbers the row
+ *  is scanned for. Cost is never here: it is hidden by default. */
+function metaLabel(item: Item) {
+  const parts: string[] = [];
+  if (item.quantity != null) parts.push(`qty ${item.quantity}`);
+  if (item.price != null) parts.push(`$${item.price}`);
+  return parts.length > 0 ? parts.join(' · ') : 'no qty';
 }
 
 /**
@@ -34,7 +37,7 @@ export default function MobileItemList({ items, onSelect }: {
             <span className="text-base font-medium leading-[1.3] truncate">{item.title}</span>
             <span className="flex gap-[10px] items-baseline">
               <span className="font-mono text-[13px] text-green-400">{item.sku}</span>
-              <span className="text-[13px] text-gray-400">{qtyLabel(item)}</span>
+              <span className="text-[13px] text-gray-400">{metaLabel(item)}</span>
             </span>
           </span>
           <span

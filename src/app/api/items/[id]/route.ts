@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServer } from '@/lib/supabase-server';
 import { denyUnlessBatchAccess, hasBatchCookie } from '@/lib/batch-access';
+import { pickItemUpdate } from '@/lib/item-update';
 import { ItemUpdate } from '@/lib/types';
 
 export async function PATCH(
@@ -8,8 +9,24 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const { batch_id: claimedBatchId, ...fields }: ItemUpdate & { batch_id?: string } =
-    await req.json();
+
+  let body: Record<string, unknown>;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+  }
+
+  const claimedBatchId = typeof body.batch_id === 'string' ? body.batch_id : undefined;
+
+  // Only allow-listed fields reach Postgres, each coerced to its column's shape.
+  // Without this the body's keys went straight through, so any column in the row
+  // was writable — including batch_id's siblings and created_at.
+  const picked = pickItemUpdate(body);
+  if ('error' in picked) {
+    return NextResponse.json({ error: picked.error }, { status: 400 });
+  }
+
   const supabase = getSupabaseServer();
 
   // Reviewing is a tap on a phone, so the usual path must stay one round trip:
@@ -31,7 +48,7 @@ export async function PATCH(
   }
 
   const update: ItemUpdate = {
-    ...fields,
+    ...picked.update,
     reviewed_at: new Date().toISOString(),
   };
 

@@ -1,5 +1,5 @@
 'use client';
-import { Item, ItemUpdate } from '@/lib/types';
+import { Item, ItemFacets, ItemUpdate } from '@/lib/types';
 import { STATUS_BADGE, STATUS_LABEL } from '@/lib/item-status';
 import ItemDetail from './ItemDetail';
 import MobileItemList from './MobileItemList';
@@ -10,6 +10,8 @@ interface Props {
   onUpdate: (id: string, update: ItemUpdate) => void;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
+  /** Existing values in this batch, offered while editing. */
+  facets?: ItemFacets;
 }
 
 /**
@@ -22,7 +24,7 @@ interface Props {
  *   selected. A five-column table in a 375px viewport meant the Status column,
  *   the reason he opens the screen, was off the right edge.
  */
-export default function TableView({ items, onUpdate, selectedId, onSelect }: Props) {
+export default function TableView({ items, onUpdate, selectedId, onSelect, facets }: Props) {
   // Derived, not stored: if a filter or search change drops the selected item
   // from the page, that falls back to the list on its own.
   const selected = items.find(i => i.id === selectedId) ?? null;
@@ -43,9 +45,9 @@ export default function TableView({ items, onUpdate, selectedId, onSelect }: Pro
               <tr>
                 <th className="text-left px-3 py-2">SKU</th>
                 <th className="text-left px-3 py-2">Title</th>
+                <th className="text-left px-3 py-2">Category</th>
                 <th className="text-left px-3 py-2">Status</th>
-                <th className="text-right px-3 py-2">Good</th>
-                <th className="text-right px-3 py-2">Sold</th>
+                <th className="text-right px-3 py-2">Qty</th>
               </tr>
             </thead>
             <tbody>
@@ -61,16 +63,16 @@ export default function TableView({ items, onUpdate, selectedId, onSelect }: Pro
                   <td className="px-3 py-2.5 max-w-[200px]">
                     <span className="block truncate">{item.title}</span>
                   </td>
+                  <td className="px-3 py-2.5 max-w-[140px] text-gray-400 text-sm">
+                    <span className="block truncate">{item.category ?? '—'}</span>
+                  </td>
                   <td className="px-3 py-2.5">
                     <span className={`text-sm px-2 py-0.5 rounded-full whitespace-nowrap ${STATUS_BADGE[item.status]}`}>
                       {STATUS_LABEL[item.status]}
                     </span>
                   </td>
                   <td className="px-3 py-2.5 text-right text-gray-400 text-sm">
-                    {item.qty_good ?? '—'}
-                  </td>
-                  <td className="px-3 py-2.5 text-right text-gray-400 text-sm">
-                    {item.qty_sold}
+                    {item.quantity ?? '—'}
                   </td>
                 </tr>
               ))}
@@ -86,7 +88,7 @@ export default function TableView({ items, onUpdate, selectedId, onSelect }: Pro
             >
               ✕ Close
             </button>
-            <ItemDetail key={selected.id} item={selected} onUpdate={onUpdate} />
+            <ItemDetail key={selected.id} item={selected} onUpdate={onUpdate} facets={facets} />
           </div>
         )}
       </div>
@@ -101,6 +103,7 @@ export default function TableView({ items, onUpdate, selectedId, onSelect }: Pro
             onSelect={onSelect}
             onClose={() => onSelect(null)}
             onUpdate={onUpdate}
+            facets={facets}
           />
         ) : (
           <MobileItemList items={items} onSelect={onSelect} />

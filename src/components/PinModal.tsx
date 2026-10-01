@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 export interface PinModalProps {
   batchId: string;
   batchName: string;
-  mode: 'access' | 'delete';
+  mode: 'access' | 'delete' | 'export';
   onSuccess: (pin: string, isMaster: boolean) => void;
   onCancel: () => void;
 }
@@ -50,8 +50,14 @@ export default function PinModal({ batchId, batchName, mode, onSuccess, onCancel
     }
   }
 
-  const title = mode === 'delete' ? `Delete "${batchName}"` : `Access "${batchName}"`;
-  const buttonLabel = mode === 'delete' ? 'Confirm Delete' : 'Unlock';
+  const title =
+    mode === 'delete' ? `Delete "${batchName}"` :
+    mode === 'export' ? `Download "${batchName}"` :
+    `Access "${batchName}"`;
+  const buttonLabel =
+    mode === 'delete' ? 'Confirm Delete' :
+    mode === 'export' ? 'Download' :
+    'Unlock';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">

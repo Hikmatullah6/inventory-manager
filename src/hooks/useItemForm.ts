@@ -12,9 +12,18 @@ import { Item, ItemStatus, ItemUpdate } from '@/lib/types';
  */
 export function useItemForm(item: Item, onUpdate: (id: string, update: ItemUpdate) => void) {
   const [status, setStatus] = useState<ItemStatus>(item.status);
-  const [qtyGood, setQtyGood] = useState(item.qty_good != null ? String(item.qty_good) : '');
-  const [qtyBroken, setQtyBroken] = useState(item.qty_broken != null ? String(item.qty_broken) : '');
-  const [qtySold, setQtySold] = useState(String(item.qty_sold));
+  const [title, setTitle] = useState(item.title);
+  const [description, setDescription] = useState(item.description ?? '');
+  const [condition, setCondition] = useState(item.condition ?? '');
+  const [quantity, setQuantity] = useState(item.quantity != null ? String(item.quantity) : '');
+  const [price, setPrice] = useState(item.price != null ? String(item.price) : '');
+  const [estimatedRetail, setEstimatedRetail] = useState(
+    item.estimated_retail != null ? String(item.estimated_retail) : ''
+  );
+  const [season, setSeason] = useState(item.season ?? '');
+  const [category, setCategory] = useState(item.category ?? '');
+  const [subcategory, setSubcategory] = useState<string[]>(item.subcategory);
+  const [tags, setTags] = useState<string[]>(item.tags);
   const [location, setLocation] = useState(item.shelf_location ?? '');
   const [notes, setNotes] = useState(item.notes ?? '');
   const [salePrice, setSalePrice] = useState(item.sale_price != null ? String(item.sale_price) : '');
@@ -23,7 +32,7 @@ export function useItemForm(item: Item, onUpdate: (id: string, update: ItemUpdat
   function handleStatusClick(s: ItemStatus) {
     setStatus(s);
     if (s !== 'sold') {
-      // A price only means something while the item is sold.
+      // A sale price only means something while the item is sold.
       setSalePrice('');
       onUpdate(item.id, { status: s, sale_price: null });
     } else {
@@ -38,15 +47,43 @@ export function useItemForm(item: Item, onUpdate: (id: string, update: ItemUpdat
     onUpdate(item.id, { status: s, sale_price: price });
   }
 
-  function handleBlur(field: keyof ItemUpdate, value: string | number | null) {
+  function handleBlur(field: keyof ItemUpdate, value: string | number | string[] | null) {
     onUpdate(item.id, { [field]: value });
+  }
+
+  /** A text field: commit the trimmed value, or null when it is emptied. */
+  function commitText(field: keyof ItemUpdate, value: string) {
+    handleBlur(field, value.trim() || null);
+  }
+
+  /** A number field: never send NaN to a numeric column. */
+  function commitNumber(field: keyof ItemUpdate, value: string, integer = false) {
+    const raw = value.trim();
+    if (!raw) return handleBlur(field, null);
+    const n = integer ? parseInt(raw, 10) : parseFloat(raw);
+    handleBlur(field, Number.isFinite(n) ? n : null);
+  }
+
+  /**
+   * Multi-value chips: the whole array goes in one write, and an emptied field
+   * writes `[]` rather than null — the columns are NOT NULL DEFAULT '{}'.
+   */
+  function commitList(field: 'subcategory' | 'tags', next: string[]) {
+    if (field === 'subcategory') setSubcategory(next); else setTags(next);
+    handleBlur(field, next);
   }
 
   return {
     status, setStatus,
-    qtyGood, setQtyGood,
-    qtyBroken, setQtyBroken,
-    qtySold, setQtySold,
+    title, setTitle,
+    description, setDescription,
+    condition, setCondition,
+    quantity, setQuantity,
+    price, setPrice,
+    estimatedRetail, setEstimatedRetail,
+    season, setSeason,
+    category, setCategory,
+    subcategory, tags,
     location, setLocation,
     notes, setNotes,
     salePrice, setSalePrice,
@@ -54,6 +91,9 @@ export function useItemForm(item: Item, onUpdate: (id: string, update: ItemUpdat
     handleStatusClick,
     restoreStatus,
     handleBlur,
+    commitText,
+    commitNumber,
+    commitList,
   };
 }
 
@@ -64,12 +104,16 @@ export type ItemFormState = ReturnType<typeof useItemForm>;
  * value. Read from the live form state, not the row, so the badge updates as
  * soon as an edit is committed. Both layouts show the same number.
  */
-export function countFilledDetails(form: ItemFormState, item: Item): number {
+export function countFilledDetails(form: ItemFormState): number {
   const filled = [
-    !!item.description?.trim(),
-    form.qtyGood !== '',
-    form.qtyBroken !== '',
-    form.qtySold !== '' && Number(form.qtySold) > 0,
+    form.description.trim() !== '',
+    form.condition.trim() !== '',
+    form.price !== '',
+    form.estimatedRetail !== '',
+    form.season.trim() !== '',
+    form.category.trim() !== '',
+    form.subcategory.length > 0,
+    form.tags.length > 0,
     form.location.trim() !== '',
     form.notes.trim() !== '',
   ];

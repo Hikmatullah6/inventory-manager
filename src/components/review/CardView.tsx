@@ -1,5 +1,5 @@
 'use client';
-import { Item, ItemUpdate } from '@/lib/types';
+import { Item, ItemFacets, ItemUpdate } from '@/lib/types';
 import ItemDetail from './ItemDetail';
 
 interface Props {
@@ -8,9 +8,11 @@ interface Props {
   total: number;
   onNavigate: (index: number) => void;
   onUpdate: (id: string, update: ItemUpdate) => void;
+  /** Existing values in this batch, offered while editing. */
+  facets?: ItemFacets;
 }
 
-export default function CardView({ items, currentIndex, total, onNavigate, onUpdate }: Props) {
+export default function CardView({ items, currentIndex, total, onNavigate, onUpdate, facets }: Props) {
   const item = items[currentIndex];
 
   if (!item) return (
@@ -21,7 +23,7 @@ export default function CardView({ items, currentIndex, total, onNavigate, onUpd
 
   return (
     <div className="space-y-4">
-      <ItemDetail key={item.id} item={item} onUpdate={onUpdate} />
+      <ItemDetail key={item.id} item={item} onUpdate={onUpdate} facets={facets} />
 
       <div className="flex items-center justify-between pt-2 border-t border-gray-700">
         <button

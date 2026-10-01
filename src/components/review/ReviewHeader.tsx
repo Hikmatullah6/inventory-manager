@@ -8,9 +8,11 @@ interface Props {
   total: number;
   view: 'card' | 'table';
   onViewChange: (v: 'card' | 'table') => void;
+  costVisible: boolean;
+  onCostVisible: (next: boolean) => void;
 }
 
-export default function ReviewHeader({ batchName, batchId, reviewed, total, view, onViewChange }: Props) {
+export default function ReviewHeader({ batchName, batchId, reviewed, total, view, onViewChange, costVisible, onCostVisible }: Props) {
   const pct = total > 0 ? Math.round((reviewed / total) * 100) : 0;
 
   return (
@@ -53,6 +55,23 @@ export default function ReviewHeader({ batchName, batchId, reviewed, total, view
           </div>
         </div>
         <div className="flex items-center gap-3">
+          {/* The eye lives here, not in the filter row: on a phone the filter row
+              is hidden while the detail pane is open, and the pane is exactly
+              where cost is rendered. The second row has the space the first does
+              not — at 375px the first row is already Back + name + three
+              buttons. */}
+          <button
+            onClick={() => onCostVisible(!costVisible)}
+            aria-pressed={costVisible}
+            aria-label={costVisible ? 'Hide cost' : 'Show cost'}
+            title={costVisible ? 'Hide cost' : 'Show cost'}
+            className={`flex-none min-h-11 min-w-11 -my-2 inline-flex items-center justify-center
+              rounded-lg text-base transition-colors ${
+                costVisible ? 'text-blue-300 hover:bg-gray-800' : 'text-gray-500 hover:bg-gray-800'
+              }`}
+          >
+            {costVisible ? '👁' : '🚫'}
+          </button>
           <div className="flex-1 h-1.5 bg-gray-700 rounded-full overflow-hidden">
             <div
               className="h-full bg-blue-500 rounded-full transition-all duration-300"

@@ -2,15 +2,23 @@
 import { useCallback, useRef } from 'react';
 import { Item, ItemUpdate } from '@/lib/types';
 
+/**
+ * Commit one field (or a few) of one item.
+ *
+ * Writes to the same item are serialised rather than dropped. Each item's
+ * pending writes are chained onto one promise, so a blur followed immediately by
+ * a status tap sends both in order instead of silently losing the second — which
+ * is what the previous in-flight guard did, and which matters much more now that
+ * fourteen fields are editable rather than six.
+ */
 export function useItemUpdate(batchId: string, onSuccess?: (item: Item) => void) {
-  const inFlight = useRef<Set<string>>(new Set());
+  /** Per item: the tail of its write chain. */
+  const queues = useRef<Map<string, Promise<void>>>(new Map());
   const onSuccessRef = useRef(onSuccess);
   onSuccessRef.current = onSuccess;
 
-  const updateItem = useCallback(async (id: string, update: ItemUpdate) => {
-    if (inFlight.current.has(id)) return;
-    inFlight.current.add(id);
-    try {
+  const updateItem = useCallback((id: string, update: ItemUpdate) => {
+    const send = async () => {
       const res = await fetch(`/api/items/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -22,9 +30,20 @@ export function useItemUpdate(batchId: string, onSuccess?: (item: Item) => void)
         const item: Item = await res.json();
         onSuccessRef.current?.(item);
       }
-    } finally {
-      inFlight.current.delete(id);
-    }
+    };
+
+    // A rejected link must not break the chain for later writes.
+    const next = (queues.current.get(id) ?? Promise.resolve())
+      .then(send, send)
+      .catch(() => {});
+
+    queues.current.set(id, next);
+    // Let the map shrink once this item has gone quiet.
+    next.finally(() => {
+      if (queues.current.get(id) === next) queues.current.delete(id);
+    });
+
+    return next;
   }, [batchId]); // onSuccess is accessed via ref, so only the batch matters
 
   return { updateItem };
