@@ -26,3 +26,21 @@ applying, against a batch with a few tagged items:
 -- Expect four sorted arrays; tags/subcategories flattened and deduped.
 select item_facets('<a batch id>');
 ```
+
+## 006_filter_counts.sql
+
+Adds `item_filter_counts()`: the status chip totals plus a match count for every
+category / subcategory / tag / season / month / day option, in one call. Without
+it the filter dropdowns render empty — the review screen still works, because
+`getFilterCounts` returns empty counts rather than throwing.
+
+It supersedes `item_facets()` from 005, which is deliberately left in place so
+rolling the deploy back keeps working.
+
+```sql
+-- Expect { statuses: {...}, category: [{value,count}...], months: [...], ... }
+select item_filter_counts('<a batch id>');
+
+-- And with a filter applied, to see other facets' counts narrow:
+select item_filter_counts('<a batch id>', '', null, array['Tools & Hardware']);
+```

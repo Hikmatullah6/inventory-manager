@@ -37,8 +37,7 @@ src/
 │   ├── loading.tsx       # Skeletons, one per slow route
 │   └── api/              # API routes
 │       ├── upload/, items/, export/
-│       ├── items/counts/ # Per-status totals for the mobile filter chips
-│       ├── items/facets/ # Distinct values behind the filter pickers
+│       ├── items/counts/ # Status totals AND every filter option's count
 │       ├── thumbnail/    # Item-photo proxy (see "Item photos")
 │       └── batches/[id]/ # GET one batch, DELETE it, verify-pin/
 ├── components/           # React components
@@ -46,7 +45,8 @@ src/
 │   ├── review/           # ReviewClient, TableView (desktop table + phone
 │   │                     # layouts), MobileItemList, MobileDetailPane,
 │   │                     # CardView, ItemDetail, CollapsibleSection,
-│   │                     # ReviewHeader, SearchFilter, FilterSheet, ChipInput
+│   │                     # ReviewHeader, SearchFilter, FilterPanel,
+│   │                     # FilterDropdown, DateFilter, ChipInput
 │   ├── export/           # ExportStats, ExportButtons
 │   ├── PinModal.tsx      # 4-digit PIN entry modal
 │   ├── PinGate.tsx       # Client-side PIN gate wrapper
@@ -56,8 +56,8 @@ src/
 │   ├── batches.ts        # Server-side batch list with counts
 │   ├── item-status.ts    # Status labels, badges, dots, options
 │   ├── item-query.ts     # THE filters/sort/search builder — see "Queries"
-│   ├── item-counts.ts    # Per-status totals behind the filter chips
-│   ├── item-facets.ts    # Distinct values behind the filter pickers
+│   ├── item-counts.ts    # The status vocabulary (counts live in filter-counts)
+│   ├── filter-counts.ts  # Status totals + every filter option's count, one rpc
 │   ├── item-update.ts    # PATCH allow-list + coercion
 │   ├── multi-value.ts    # The split/join pair for subcategory + tags
 │   ├── thumbnail.ts      # Builds the proxied item-photo URL
@@ -68,7 +68,7 @@ src/
 │   └── supabase-*.ts     # Supabase clients
 └── hooks/                # useItems (accepts server-rendered initialData),
                           # useItemUpdate, useItemForm, useDetailsOpen,
-                          # useCostVisible
+                          # useCostVisible, useFiltersOpen
 └── __tests__/            # Jest test files
 ```
 
@@ -88,12 +88,14 @@ downloading, and render on the server.
 - `/` sets `export const dynamic = 'force-dynamic'`. Without it Next prerenders
   the batch list at build time and the review counts freeze at deploy.
 - `loading.tsx` files render a skeleton the instant a link is tapped.
-- The filter pickers' values come from one `item_facets()` call, which dedupes
-  inside Postgres. Deriving them in the browser would mean downloading the batch
-  — `subcategory` and `tags` are arrays, so there is no counting shortcut.
-  `getItemFacets` swallows its own errors and returns empty facets: it sits in
-  that `Promise.all`, so a throw would take the whole screen to a 500, which is
-  exactly what would happen between a deploy and migration 005 being applied.
+- **Every number the filter UI shows comes from one `item_filter_counts()` call**
+  — the seven status chip totals and a count for each category / subcategory /
+  tag / season / month / day option. A real batch has 714 tags and 145
+  subcategories, so a count query per option is 900+ round trips per selection
+  change. `getFilterCounts` swallows its own errors and returns empty counts: it
+  sits in that `Promise.all`, so a throw would take the whole screen to a 500,
+  which is exactly what would happen between a deploy and the migration being
+  applied.
 - When adding a screen, put the first paint's data on the server side of the
   client boundary.
 
@@ -218,29 +220,47 @@ The review screen gets walked through with customers standing next to it, so
 ### Filter chips
 
 Below `sm:` the status dropdown becomes a scrolling row of chips with live
-counts. Those counts come from `/api/items/counts` (`src/lib/item-counts.ts`),
-never from the loaded page — that page is 50 rows out of several thousand. They
-are recounted when the search or the facet filters change, and adjusted locally
-on a status tap, so marking an item does not cost a round trip.
+counts. Those counts come from `/api/items/counts`
+(`src/lib/filter-counts.ts`), never from the loaded page — that page is 50 rows
+out of several thousand. They arrive in the same payload as the dropdown option
+counts, so the two cannot disagree. They are recounted when the search or the
+facet filters change, and adjusted locally on a status tap, so marking an item
+does not cost a round trip.
 
 ### The facet filters
 
-Date bought, category, subcategory, tags and season live in `FilterSheet`, opened
-by a `Filters · N` button present in both layouts. Status stays chips — it is the
-primary axis and the only filter with live counts.
+A filter section sits under the search bar: one dropdown per column — Category,
+Subcategory, Tags, Season, Date bought. `FilterPanel` owns it, `FilterDropdown`
+renders a column's options and `DateFilter` renders the months. Status stays
+chips; it is the primary axis.
 
-- Five pickers do not fit in the chip rail, and a second horizontal scroller
-  would fight the rail for the same gesture. So below `sm:` the sheet is a bottom
-  drawer (`max-h-[85dvh]`, sticky Clear / Show items footer) and at `sm:` and up
-  the same body renders as a dropdown panel. The caller passes `variant`, so only
-  one dialog is in the tree per breakpoint.
-- Selections are held in the sheet and committed once, so filtering costs one
-  refetch per visit to the sheet rather than one per tap.
-- `dateBought` is a multi-select of the batch's actual purchase dates, not a
-  from/to range: a batch is one or a few buying trips, so the distinct values are
-  short and already in the facets payload, and all five filters stay one control
-  type. Newest-first and oldest-first are in the **sort**, not here.
-- Every filter matches **any** of its selected values.
+- Both presentations are always mounted and chosen by CSS. **`sm:` and up** is a
+  row of buttons with floating popovers. **Below `sm:`** it is a collapsible
+  panel whose columns expand *in place* — a floating popover inside the phone's
+  scrolling column gets clipped by its ancestors or positioned off-screen. The
+  caller passes `variant`, so each layout renders only its own half.
+- The phone panel's open flag is `useFiltersOpen`, module-level and mirrored into
+  `localStorage` for the same reasons as `useDetailsOpen`. Someone working a
+  customer's request opens it once; it should not close on every tap.
+- Only one dropdown is open at a time, which keeps the 714-option tag list out of
+  the DOM alongside the others.
+- **Options carry their match count and 0 greys them out**, so a combination that
+  would show nothing cannot be picked. A ticked option is never disabled — that
+  would trap the filter on.
+- Options arrive **sorted by count descending** from the function, so what is
+  actually in the batch is at the top and the unavailable values sink to the
+  bottom instead of filling the list. Past 12 values a column gets a
+  type-to-narrow box and renders at most 100 rows; a real batch has 714 tags and
+  145 subcategories.
+- **Date bought is months, each expanding to its days.** ~190 distinct dates is
+  not a list anyone scrolls; grouped it is about eight months. Ticking a day
+  implies its month, and unticking a month drops that month's days, so the two
+  fields cannot disagree. In the query a month is a half-open `[first, next
+  first)` range rather than `to_char(...)`, which keeps the
+  `(batch_id, date_bought, id)` index usable. Newest-first and oldest-first are
+  in the **sort**, not here.
+- Every filter matches **any** of its own selected values, and different filters
+  narrow each other.
 
 ## Environment Variables
 
@@ -306,6 +326,10 @@ Managed in Supabase. Migrations live in `supabase/migrations/` — apply each in
 - `002_auction_date_range.sql` — adds `auction_date_end date` column to items
 - `003_pin_auth.sql` — adds `pin_hash text` column to `auction_batches`
 - `004_sold_personal_use.sql` — adds `sale_price numeric` column to items; expands status check constraint to include `sold` and `personal_use`
+- `006_filter_counts.sql` — adds `item_filter_counts()`, which returns every
+  number the filter UI renders in one call. Supersedes `item_facets()` from 005;
+  that function is deliberately left in place so rolling the deploy back still
+  works. **Apply it before deploying** — without it the dropdowns are empty.
 - `005_new_import_format.sql` — the 18-column sheet: adds `condition`,
   `estimated_retail`, `price`, `category`, `season`, `quantity`, and
   `subcategory`/`tags` as `text[] NOT NULL DEFAULT '{}'`; adds the generated

@@ -37,16 +37,19 @@ const STATUSES: ItemStatus[] = [
 ];
 
 /**
- * The five facet filters. Each matches ANY of the selected values; an empty
- * array means the filter is off.
+ * The facet filters. Each matches ANY of its selected values; an empty array
+ * means that filter is off. Different facets narrow each other (AND), so
+ * `category: ['Tools']` plus `tags: ['dewalt','makita']` is "Tools, by either
+ * brand".
  *
- * `dateBought` is a selection of the batch's actual purchase dates rather than
- * a from/to range: a batch is one or a few buying trips, so the distinct values
- * are short and already in the facets payload — and it keeps all five filters
- * one control type. New-to-old and old-to-new live in the sort, not here.
+ * Date bought is two fields rather than one list of days: a real batch has ~190
+ * distinct purchase dates, which is not a list anyone scrolls. `months` is the
+ * coarse pick ('2026-09') and `dates` narrows to days **within** the chosen
+ * months. Newest-first and oldest-first live in the sort, not here.
  */
 export interface FacetSelection {
-  dateBought: string[];
+  months: string[];
+  dates: string[];
   category: string[];
   subcategory: string[];
   tags: string[];
@@ -54,8 +57,12 @@ export interface FacetSelection {
 }
 
 export const EMPTY_FACET_SELECTION: FacetSelection = {
-  dateBought: [], category: [], subcategory: [], tags: [], season: [],
+  months: [], dates: [], category: [], subcategory: [], tags: [], season: [],
 };
+
+/** The facets a dropdown is built for, in the order they appear in the panel. */
+export const FACET_FIELDS = ['category', 'subcategory', 'tags', 'season'] as const;
+export type FacetField = (typeof FACET_FIELDS)[number];
 
 export interface ItemFilters extends FacetSelection {
   /** Raw user text. Never pre-escape it; applyItemFilters handles that. */
@@ -77,7 +84,7 @@ export const DEFAULT_FILTERS: ItemFilters = {
   page: 1,
 };
 
-const FACET_KEYS = ['dateBought', 'category', 'subcategory', 'tags', 'season'] as const;
+const FACET_KEYS = ['months', 'dates', 'category', 'subcategory', 'tags', 'season'] as const;
 
 /**
  * Read filters off a query string. Unknown `status` and `sort` values fall back
@@ -143,11 +150,23 @@ export function escapeLikeTerm(raw: string): string {
   return raw.replace(/[\\%_]/g, m => `\\${m}`).replace(/\*/g, '');
 }
 
+/** '2026-09' -> '2026-09-01' */
+export function monthStart(month: string): string {
+  return `${month}-01`;
+}
+
+/** '2026-09' -> '2026-10-01', rolling the year over at December. */
+export function monthEnd(month: string): string {
+  const [y, m] = month.split('-').map(Number);
+  return m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`;
+}
+
 /** Minimal shape of the supabase-js filter builder, so this file needs no client. */
 interface FilterBuilder {
   eq(column: string, value: unknown): this;
   in(column: string, values: readonly unknown[]): this;
   ilike(column: string, pattern: string): this;
+  or(filters: string): this;
   overlaps(column: string, value: string[]): this;
   order(column: string, opts: { ascending: boolean }): this;
 }
@@ -172,11 +191,21 @@ export function applyItemFilters<Q>(
 
   if (opts.includeStatus !== false && f.status !== 'all') q = q.eq('status', f.status);
   if (f.search) q = q.ilike('search_text', `%${escapeLikeTerm(f.search)}%`);
-  if (f.dateBought.length) q = q.in('date_bought', f.dateBought);
   if (f.category.length) q = q.in('category', f.category);
   if (f.season.length) q = q.in('season', f.season);
   if (f.subcategory.length) q = q.overlaps('subcategory', f.subcategory);
   if (f.tags.length) q = q.overlaps('tags', f.tags);
+
+  // Months bound the range; days narrow inside it. A month is expressed as a
+  // half-open [first, next first) window rather than to_char(), so the
+  // (batch_id, date_bought, id) index is still usable.
+  if (f.months.length) {
+    const spans = f.months
+      .filter(m => /^\d{4}-\d{2}$/.test(m))
+      .map(m => `and(date_bought.gte.${monthStart(m)},date_bought.lt.${monthEnd(m)})`);
+    if (spans.length) q = q.or(spans.join(','));
+  }
+  if (f.dates.length) q = q.in('date_bought', f.dates);
 
   return q as Q;
 }

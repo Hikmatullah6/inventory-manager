@@ -1,7 +1,7 @@
 import {
   applyItemFilters, applySort, countSelectedFacets, DEFAULT_FILTERS, DEFAULT_SORT,
-  escapeLikeTerm, filtersToParams, pageRange, PAGE_SIZE, parseItemFilters,
-  SORT_KEYS, SORT_MAP, type ItemFilters,
+  escapeLikeTerm, filtersToParams, monthEnd, monthStart, pageRange, PAGE_SIZE,
+  parseItemFilters, SORT_KEYS, SORT_MAP, type ItemFilters,
 } from '@/lib/item-query';
 
 /** Records every predicate instead of talking to Supabase. */
@@ -12,6 +12,7 @@ function recorder() {
     in(c: string, v: readonly unknown[]) { calls.push(['in', c, v]); return this; },
     ilike(c: string, p: string) { calls.push(['ilike', c, p]); return this; },
     overlaps(c: string, v: string[]) { calls.push(['overlaps', c, v]); return this; },
+    or(f: string) { calls.push(['or', f]); return this; },
     order(c: string, o: { ascending: boolean }) { calls.push(['order', c, o.ascending]); return this; },
   };
   return { builder, calls };
@@ -57,18 +58,51 @@ describe('applyItemFilters', () => {
     const { builder, calls } = recorder();
     applyItemFilters(builder, 'b1', filters({
       status: 'all',
-      dateBought: ['2026-03-05'],
       category: ['Tools'],
       season: ['Winter'],
       subcategory: ['Drills'],
       tags: ['dewalt', 'cordless'],
     }));
-    expect(calls).toContainEqual(['in', 'date_bought', ['2026-03-05']]);
     expect(calls).toContainEqual(['in', 'category', ['Tools']]);
     expect(calls).toContainEqual(['in', 'season', ['Winter']]);
     // overlaps is "match ANY of these", which is what was asked for.
     expect(calls).toContainEqual(['overlaps', 'subcategory', ['Drills']]);
     expect(calls).toContainEqual(['overlaps', 'tags', ['dewalt', 'cordless']]);
+  });
+
+  describe('date bought', () => {
+    it('turns a month into a half-open range, so the date index still applies', () => {
+      const { builder, calls } = recorder();
+      applyItemFilters(builder, 'b1', filters({ status: 'all', months: ['2026-09'] }));
+      expect(calls).toContainEqual([
+        'or', 'and(date_bought.gte.2026-09-01,date_bought.lt.2026-10-01)',
+      ]);
+    });
+
+    it('ORs several months together', () => {
+      const { builder, calls } = recorder();
+      applyItemFilters(builder, 'b1', filters({ status: 'all', months: ['2026-09', '2026-12'] }));
+      expect(calls).toContainEqual([
+        'or',
+        'and(date_bought.gte.2026-09-01,date_bought.lt.2026-10-01),' +
+        'and(date_bought.gte.2026-12-01,date_bought.lt.2027-01-01)',
+      ]);
+    });
+
+    it('narrows to days within the months', () => {
+      const { builder, calls } = recorder();
+      applyItemFilters(builder, 'b1', filters({
+        status: 'all', months: ['2026-09'], dates: ['2026-09-20', '2026-09-27'],
+      }));
+      expect(calls).toContainEqual(['in', 'date_bought', ['2026-09-20', '2026-09-27']]);
+      expect(calls.some(c => c[0] === 'or')).toBe(true);
+    });
+
+    it('ignores a malformed month rather than building a broken range', () => {
+      const { builder, calls } = recorder();
+      applyItemFilters(builder, 'b1', filters({ status: 'all', months: ['nope'] }));
+      expect(calls.some(c => c[0] === 'or')).toBe(false);
+    });
   });
 
   it('emits nothing for an empty facet', () => {
@@ -129,10 +163,19 @@ describe('parseItemFilters', () => {
       sort: 'sku_desc',
       page: 3,
       tags: ['Hardware, Fasteners', 'b'],
-      dateBought: ['2026-03-05'],
+      months: ['2026-03'],
+      dates: ['2026-03-05'],
     });
     const back = parseItemFilters(filtersToParams('b1', original));
     expect(back).toEqual(original);
+  });
+});
+
+describe('month boundaries', () => {
+  it('spans a month, rolling the year over at December', () => {
+    expect(monthStart('2026-09')).toBe('2026-09-01');
+    expect(monthEnd('2026-09')).toBe('2026-10-01');
+    expect(monthEnd('2026-12')).toBe('2027-01-01');
   });
 });
 
@@ -140,6 +183,7 @@ describe('helpers', () => {
   it('counts only the facet filters, not search or status', () => {
     expect(countSelectedFacets(filters({ search: 'x', status: 'sold' }))).toBe(0);
     expect(countSelectedFacets(filters({ tags: ['a', 'b'], category: ['Tools'] }))).toBe(3);
+    expect(countSelectedFacets(filters({ months: ['2026-09'], dates: ['2026-09-20'] }))).toBe(2);
   });
 
   it('gives an inclusive, non-overlapping window per page', () => {

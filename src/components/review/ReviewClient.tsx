@@ -1,9 +1,8 @@
 'use client';
-import { useState, useCallback, useEffect, useSyncExternalStore } from 'react';
+import { useState, useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
-import { AuctionBatch, Item, ItemFacets, ItemStatus, ItemUpdate, ItemsQueryResult } from '@/lib/types';
-import { EMPTY_COUNTS, type StatusCounts } from '@/lib/item-counts';
-import { EMPTY_FACETS } from '@/lib/item-facets';
+import { AuctionBatch, Item, ItemStatus, ItemUpdate, ItemsQueryResult } from '@/lib/types';
+import { EMPTY_FILTER_COUNTS, facetValuesFrom, type FilterCounts } from '@/lib/filter-counts';
 import {
   DEFAULT_FILTERS, DEFAULT_SORT, filtersToParams,
   type FacetSelection, type ItemFilters, type SortKey,
@@ -30,13 +29,11 @@ interface Props {
   /** First page of items, rendered on the server — null while the batch is
    *  locked, so a protected batch's rows never reach the HTML. */
   initialItems: ItemsQueryResult | null;
-  /** Totals behind each filter chip, counted on the server. Null when locked. */
-  initialCounts: StatusCounts | null;
-  /** Distinct values for the facet pickers. Null when locked. */
-  initialFacets: ItemFacets | null;
+  /** Status chip totals and every dropdown option's count. Null when locked. */
+  initialCounts: FilterCounts | null;
 }
 
-export default function ReviewClient({ batch, initialItems, initialCounts, initialFacets }: Props) {
+export default function ReviewClient({ batch, initialItems, initialCounts }: Props) {
   const batchId = batch.id;
   const router = useRouter();
   const [view, setView] = useState<'card' | 'table'>('table');
@@ -46,8 +43,7 @@ export default function ReviewClient({ batch, initialItems, initialCounts, initi
   const [filters, setFilters] = useState<ItemFilters>(DEFAULT_FILTERS);
   const [cardIndex, setCardIndex] = useState(0);
   const [localItems, setLocalItems] = useState<Item[]>(initialItems?.items ?? []);
-  const [counts, setCounts] = useState<StatusCounts>(initialCounts ?? EMPTY_COUNTS);
-  const [facets, setFacets] = useState<ItemFacets>(initialFacets ?? EMPTY_FACETS);
+  const [counts, setCounts] = useState<FilterCounts>(initialCounts ?? EMPTY_FILTER_COUNTS);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // Shared with both detail layouts through a module-level value, so the eye in
   // the header and the figures in the panes always agree.
@@ -105,9 +101,12 @@ export default function ReviewClient({ batch, initialItems, initialCounts, initi
   // cannot be tallied for an answer about thousands. The facet filters go along
   // too: a chip's count has to equal what tapping it would produce.
   //
-  // Keyed on the search and the facets only: status is what the chips enumerate,
-  // and neither sort nor page can change a total. Pinning those three keeps a
-  // sort change or a page turn from costing seven count queries.
+  // One request behind every number on screen: the status chip totals and each
+  // dropdown option's count, so the chips and the dropdowns cannot disagree.
+  //
+  // Keyed on the search and the facet selection. `status` is pinned to 'all'
+  // because the chips enumerate it, and sort and page are pinned because neither
+  // can change a total — otherwise a page turn would cost a recount.
   const countsKey = filtersToParams(batchId, {
     ...filters, status: 'all', sort: DEFAULT_SORT, page: 1,
   }).toString();
@@ -116,22 +115,14 @@ export default function ReviewClient({ batch, initialItems, initialCounts, initi
     let cancelled = false;
     fetch(`/api/items/counts?${countsKey}`)
       .then(r => (r.ok ? r.json() : null))
-      .then((next: StatusCounts | null) => { if (!cancelled && next) setCounts(next); })
+      .then((next: FilterCounts | null) => { if (!cancelled && next) setCounts(next); })
       .catch(() => {});
     return () => { cancelled = true; };
   }, [countsKey, canLoad]);
 
-  // The pickers' vocabulary is per batch, not per filter, so this runs once —
-  // only for the unlock-after-mount path, since the server already seeded it.
-  useEffect(() => {
-    if (!canLoad || initialFacets) return;
-    let cancelled = false;
-    fetch(`/api/items/facets?batchId=${batchId}`)
-      .then(r => (r.ok ? r.json() : null))
-      .then((next: ItemFacets | null) => { if (!cancelled && next) setFacets(next); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [batchId, canLoad, initialFacets]);
+  // The detail panes want the batch's vocabulary for their suggestion lists, not
+  // the current match counts.
+  const facets = useMemo(() => facetValuesFrom(counts), [counts]);
 
   const { updateItem } = useItemUpdate(
     batchId,
@@ -148,8 +139,11 @@ export default function ReviewClient({ batch, initialItems, initialCounts, initi
     if (next && before && next !== before) {
       setCounts(c => ({
         ...c,
-        [before]: Math.max(0, c[before] - 1),
-        [next]: c[next] + 1,
+        statuses: {
+          ...c.statuses,
+          [before]: Math.max(0, c.statuses[before] - 1),
+          [next]: c.statuses[next] + 1,
+        },
       }));
     }
     updateItem(id, update);
@@ -231,7 +225,6 @@ export default function ReviewClient({ batch, initialItems, initialCounts, initi
             sort={filters.sort}
             onSort={handleSort}
             counts={counts}
-            facets={facets}
             facetSelection={filters}
             onFacetSelection={handleFacets}
           />

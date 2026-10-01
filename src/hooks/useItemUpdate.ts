@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Item, ItemUpdate } from '@/lib/types';
 
 /**
@@ -14,8 +14,15 @@ import { Item, ItemUpdate } from '@/lib/types';
 export function useItemUpdate(batchId: string, onSuccess?: (item: Item) => void) {
   /** Per item: the tail of its write chain. */
   const queues = useRef<Map<string, Promise<void>>>(new Map());
+
+  // Held in a ref so a new callback identity does not bust the useCallback below
+  // and restart every consumer. Synced in an effect rather than during render —
+  // writing a ref while rendering is not safe under concurrent rendering, and
+  // updateItem only ever runs from an event handler, long after this has run.
   const onSuccessRef = useRef(onSuccess);
-  onSuccessRef.current = onSuccess;
+  useEffect(() => {
+    onSuccessRef.current = onSuccess;
+  });
 
   const updateItem = useCallback((id: string, update: ItemUpdate) => {
     const send = async () => {
