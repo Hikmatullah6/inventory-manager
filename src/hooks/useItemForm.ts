@@ -56,3 +56,22 @@ export function useItemForm(item: Item, onUpdate: (id: string, update: ItemUpdat
     handleBlur,
   };
 }
+
+export type ItemFormState = ReturnType<typeof useItemForm>;
+
+/**
+ * How many of the fields behind the collapsed "Details" section already have a
+ * value. Read from the live form state, not the row, so the badge updates as
+ * soon as an edit is committed. Both layouts show the same number.
+ */
+export function countFilledDetails(form: ItemFormState, item: Item): number {
+  const filled = [
+    !!item.description?.trim(),
+    form.qtyGood !== '',
+    form.qtyBroken !== '',
+    form.qtySold !== '' && Number(form.qtySold) > 0,
+    form.location.trim() !== '',
+    form.notes.trim() !== '',
+  ];
+  return filled.filter(Boolean).length;
+}

@@ -42,7 +42,8 @@ src/
 │   ├── upload/           # UploadZone, BatchList
 │   ├── review/           # ReviewClient, TableView (desktop table + phone
 │   │                     # layouts), MobileItemList, MobileDetailPane,
-│   │                     # CardView, ItemDetail, ReviewHeader, SearchFilter
+│   │                     # CardView, ItemDetail, CollapsibleSection,
+│   │                     # ReviewHeader, SearchFilter
 │   ├── export/           # ExportStats, ExportButtons
 │   ├── PinModal.tsx      # 4-digit PIN entry modal
 │   ├── PinGate.tsx       # Client-side PIN gate wrapper
@@ -60,7 +61,7 @@ src/
 │   ├── session.ts        # Client-only: sessionStorage helpers
 │   └── supabase-*.ts     # Supabase clients
 └── hooks/                # useItems (accepts server-rendered initialData),
-                          # useItemUpdate, useItemForm
+                          # useItemUpdate, useItemForm, useDetailsOpen
 └── __tests__/            # Jest test files
 ```
 
@@ -122,6 +123,25 @@ Card view and every width from `sm:` up keep normal document flow.
 `useItemForm` — two layouts, one set of rules about what an edit means. Both are
 keyed on `item.id` by their caller, so a new item starts from fresh state
 instead of needing a resync effect.
+
+### The Details section
+
+Marking an item is a status tap, so that is all either layout shows by default:
+photo, title, chips, status grid (and Sale Price when the status is `sold`).
+Description, Qty Good / Broken / Sold, Shelf / Location and Notes sit inside one
+`CollapsibleSection` titled **Details**, collapsed, which cuts the phone card
+from ~1070px of content to ~680px.
+
+- The open flag is `useDetailsOpen` — a module-level value mirrored into
+  `localStorage`, not component state. Both detail components are keyed on
+  `item.id`, so local state would collapse again on every item, and `TableView`
+  renders the phone and desktop layouts at once: one value keeps them in
+  agreement. It is read after mount, never in a `useState` initializer — the
+  review screen is server-rendered and a storage read during the first render is
+  a hydration mismatch.
+- It never auto-expands. An item with data already in those fields shows
+  `Details · N filled` instead (`countFilledDetails` in `useItemForm`), so the
+  layout does not jump between items.
 
 ### Filter chips
 

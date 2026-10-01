@@ -1,6 +1,8 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { useItemForm } from '@/hooks/useItemForm';
+import { countFilledDetails, useItemForm } from '@/hooks/useItemForm';
+import { useDetailsOpen } from '@/hooks/useDetailsOpen';
+import CollapsibleSection from './CollapsibleSection';
 import { thumbnailSrc } from '@/lib/thumbnail';
 import { STATUS_DOT, STATUS_OPTIONS, STATUS_SHORT } from '@/lib/item-status';
 import type { Item, ItemStatus, ItemUpdate } from '@/lib/types';
@@ -29,6 +31,9 @@ interface Props {
  */
 export default function MobileDetailPane({ items, item, onSelect, onClose, onUpdate }: Props) {
   const form = useItemForm(item, onUpdate);
+  // Everything below the status buttons is one disclosure, so marking an item
+  // takes no scrolling. The open flag is shared and sticky across items.
+  const [detailsOpen, setDetailsOpen] = useDetailsOpen();
   const railRef = useRef<HTMLDivElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -204,11 +209,6 @@ export default function MobileDetailPane({ items, item, onSelect, onClose, onUpd
                 View original listing ↗
               </a>
             )}
-            {item.description && (
-              <p className="m-0 text-sm leading-[1.5] text-gray-400 [text-wrap:pretty]">
-                {item.description}
-              </p>
-            )}
           </div>
 
           {/* The 2px border is always there so selecting does not shift the grid. */}
@@ -252,51 +252,64 @@ export default function MobileDetailPane({ items, item, onSelect, onClose, onUpd
             </div>
           )}
 
-          <div className="grid grid-cols-3 gap-[7px]">
-            {([
-              { label: 'Good',   value: form.qtyGood,   set: form.setQtyGood,   field: 'qty_good' as const },
-              { label: 'Broken', value: form.qtyBroken, set: form.setQtyBroken, field: 'qty_broken' as const },
-              { label: 'Sold',   value: form.qtySold,   set: form.setQtySold,   field: 'qty_sold' as const },
-            ]).map(({ label, value, set, field }) => (
-              <div key={field} className="min-w-0 flex flex-col gap-[5px]">
-                <label className="text-xs text-gray-400">{label}</label>
-                <input
-                  type="number"
-                  min="0"
-                  inputMode="numeric"
-                  value={value}
-                  onChange={e => set(e.target.value)}
-                  onBlur={() => commitNumber(field, value)}
-                  className={`${fieldClass} px-2 text-center`}
-                />
-              </div>
-            ))}
-          </div>
+          <CollapsibleSection
+            title="Details"
+            filledCount={countFilledDetails(form, item)}
+            open={detailsOpen}
+            onToggle={setDetailsOpen}
+          >
+            {item.description && (
+              <p className="m-0 text-sm leading-[1.5] text-gray-400 [text-wrap:pretty]">
+                {item.description}
+              </p>
+            )}
 
-          <div className="flex flex-col gap-[5px]">
-            <label className="text-[13px] text-gray-400">Shelf / Location</label>
-            <input
-              type="text"
-              value={form.location}
-              onChange={e => form.setLocation(e.target.value)}
-              onBlur={() => form.handleBlur('shelf_location', form.location || null)}
-              placeholder="e.g. Shelf B2, Back Room"
-              className={fieldClass}
-            />
-          </div>
+            <div className="grid grid-cols-3 gap-[7px]">
+              {([
+                { label: 'Good',   value: form.qtyGood,   set: form.setQtyGood,   field: 'qty_good' as const },
+                { label: 'Broken', value: form.qtyBroken, set: form.setQtyBroken, field: 'qty_broken' as const },
+                { label: 'Sold',   value: form.qtySold,   set: form.setQtySold,   field: 'qty_sold' as const },
+              ]).map(({ label, value, set, field }) => (
+                <div key={field} className="min-w-0 flex flex-col gap-[5px]">
+                  <label className="text-xs text-gray-400">{label}</label>
+                  <input
+                    type="number"
+                    min="0"
+                    inputMode="numeric"
+                    value={value}
+                    onChange={e => set(e.target.value)}
+                    onBlur={() => commitNumber(field, value)}
+                    className={`${fieldClass} px-2 text-center`}
+                  />
+                </div>
+              ))}
+            </div>
 
-          <div className="flex flex-col gap-[5px]">
-            <label className="text-[13px] text-gray-400">Notes</label>
-            <textarea
-              rows={3}
-              value={form.notes}
-              onChange={e => form.setNotes(e.target.value)}
-              onBlur={() => form.handleBlur('notes', form.notes || null)}
-              placeholder="Any notes..."
-              className="w-full bg-gray-800 border border-gray-600 rounded-[10px] px-3 py-[10px]
-                text-base text-white resize-none focus:outline-none focus:border-blue-400"
-            />
-          </div>
+            <div className="flex flex-col gap-[5px]">
+              <label className="text-[13px] text-gray-400">Shelf / Location</label>
+              <input
+                type="text"
+                value={form.location}
+                onChange={e => form.setLocation(e.target.value)}
+                onBlur={() => form.handleBlur('shelf_location', form.location || null)}
+                placeholder="e.g. Shelf B2, Back Room"
+                className={fieldClass}
+              />
+            </div>
+
+            <div className="flex flex-col gap-[5px]">
+              <label className="text-[13px] text-gray-400">Notes</label>
+              <textarea
+                rows={3}
+                value={form.notes}
+                onChange={e => form.setNotes(e.target.value)}
+                onBlur={() => form.handleBlur('notes', form.notes || null)}
+                placeholder="Any notes..."
+                className="w-full bg-gray-800 border border-gray-600 rounded-[10px] px-3 py-[10px]
+                  text-base text-white resize-none focus:outline-none focus:border-blue-400"
+              />
+            </div>
+          </CollapsibleSection>
 
           {/* Clears the home indicator. */}
           <div className="h-[26px]" />

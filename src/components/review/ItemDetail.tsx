@@ -2,7 +2,9 @@
 import { Item, ItemUpdate } from '@/lib/types';
 import { thumbnailSrc } from '@/lib/thumbnail';
 import { STATUS_OPTIONS } from '@/lib/item-status';
-import { useItemForm } from '@/hooks/useItemForm';
+import { countFilledDetails, useItemForm } from '@/hooks/useItemForm';
+import { useDetailsOpen } from '@/hooks/useDetailsOpen';
+import CollapsibleSection from './CollapsibleSection';
 
 interface Props {
   item: Item;
@@ -11,11 +13,16 @@ interface Props {
 
 /** Desktop detail panel. Callers key this on item.id. */
 export default function ItemDetail({ item, onUpdate }: Props) {
+  const form = useItemForm(item, onUpdate);
   const {
     status, qtyGood, setQtyGood, qtyBroken, setQtyBroken, qtySold, setQtySold,
     location, setLocation, notes, setNotes, salePrice, setSalePrice,
     imgError, setImgError, handleStatusClick, handleBlur,
-  } = useItemForm(item, onUpdate);
+  } = form;
+
+  // Everything below the status buttons is one disclosure, so a reviewer who
+  // only sets a status never scrolls past it. Open state is shared and sticky.
+  const [detailsOpen, setDetailsOpen] = useDetailsOpen();
 
   // Served through our own origin: the auction CDN rejects requests that do not
   // look like a browser, which is what a content blocker or a privacy browser
@@ -59,9 +66,6 @@ export default function ItemDetail({ item, onUpdate }: Props) {
             View original listing ↗
           </a>
         )}
-        {item.description && (
-          <p className="text-sm text-gray-400 mt-2 line-clamp-3">{item.description}</p>
-        )}
       </div>
 
       {/* Status buttons — 3×2 grid, touch-friendly */}
@@ -100,55 +104,67 @@ export default function ItemDetail({ item, onUpdate }: Props) {
         </div>
       )}
 
-      {/* Quantities */}
-      <div className="grid grid-cols-3 gap-2">
-        {[
-          { label: 'Qty Good',   value: qtyGood,   setter: setQtyGood,   field: 'qty_good' as keyof ItemUpdate },
-          { label: 'Qty Broken', value: qtyBroken, setter: setQtyBroken, field: 'qty_broken' as keyof ItemUpdate },
-          { label: 'Qty Sold',   value: qtySold,   setter: setQtySold,   field: 'qty_sold' as keyof ItemUpdate },
-        ].map(({ label, value, setter, field }) => (
-          <div key={field}>
-            <label className="text-sm text-gray-400 block mb-1">{label}</label>
-            <input
-              type="number"
-              min="0"
-              value={value}
-              onChange={e => setter(e.target.value)}
-              onBlur={() => {
-                const num = value === '' ? null : parseInt(value, 10);
-                handleBlur(field, field === 'qty_sold' ? (num ?? 0) : num);
-              }}
-              className="w-full min-h-11 bg-gray-800 border border-gray-600 rounded-lg px-2 py-2 text-base focus:outline-none focus:border-blue-400"
-            />
-          </div>
-        ))}
-      </div>
+      <CollapsibleSection
+        title="Details"
+        filledCount={countFilledDetails(form, item)}
+        open={detailsOpen}
+        onToggle={setDetailsOpen}
+      >
+        {/* Description */}
+        {item.description && (
+          <p className="text-sm text-gray-400 line-clamp-3">{item.description}</p>
+        )}
 
-      {/* Location */}
-      <div>
-        <label className="text-sm text-gray-400 block mb-1">Shelf / Location</label>
-        <input
-          type="text"
-          value={location}
-          onChange={e => setLocation(e.target.value)}
-          onBlur={() => handleBlur('shelf_location', location || null)}
-          placeholder="e.g. Shelf B2, Back Room"
-          className="w-full min-h-11 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-base focus:outline-none focus:border-blue-400"
-        />
-      </div>
+        {/* Quantities */}
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { label: 'Qty Good',   value: qtyGood,   setter: setQtyGood,   field: 'qty_good' as keyof ItemUpdate },
+            { label: 'Qty Broken', value: qtyBroken, setter: setQtyBroken, field: 'qty_broken' as keyof ItemUpdate },
+            { label: 'Qty Sold',   value: qtySold,   setter: setQtySold,   field: 'qty_sold' as keyof ItemUpdate },
+          ].map(({ label, value, setter, field }) => (
+            <div key={field}>
+              <label className="text-sm text-gray-400 block mb-1">{label}</label>
+              <input
+                type="number"
+                min="0"
+                value={value}
+                onChange={e => setter(e.target.value)}
+                onBlur={() => {
+                  const num = value === '' ? null : parseInt(value, 10);
+                  handleBlur(field, field === 'qty_sold' ? (num ?? 0) : num);
+                }}
+                className="w-full min-h-11 bg-gray-800 border border-gray-600 rounded-lg px-2 py-2 text-base focus:outline-none focus:border-blue-400"
+              />
+            </div>
+          ))}
+        </div>
 
-      {/* Notes */}
-      <div>
-        <label className="text-sm text-gray-400 block mb-1">Notes</label>
-        <textarea
-          value={notes}
-          onChange={e => setNotes(e.target.value)}
-          onBlur={() => handleBlur('notes', notes || null)}
-          rows={2}
-          placeholder="Any notes..."
-          className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-base focus:outline-none focus:border-blue-400 resize-none"
-        />
-      </div>
+        {/* Location */}
+        <div>
+          <label className="text-sm text-gray-400 block mb-1">Shelf / Location</label>
+          <input
+            type="text"
+            value={location}
+            onChange={e => setLocation(e.target.value)}
+            onBlur={() => handleBlur('shelf_location', location || null)}
+            placeholder="e.g. Shelf B2, Back Room"
+            className="w-full min-h-11 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-base focus:outline-none focus:border-blue-400"
+          />
+        </div>
+
+        {/* Notes */}
+        <div>
+          <label className="text-sm text-gray-400 block mb-1">Notes</label>
+          <textarea
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            onBlur={() => handleBlur('notes', notes || null)}
+            rows={2}
+            placeholder="Any notes..."
+            className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-base focus:outline-none focus:border-blue-400 resize-none"
+          />
+        </div>
+      </CollapsibleSection>
     </div>
   );
 }
